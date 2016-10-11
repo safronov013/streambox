@@ -7,31 +7,22 @@
 #include "detector.h"
 
 
-class ImgParams
+ImgParams::ImgParams()
 {
-public:
-	int threshold = 0;
-	int dilate = 0;
-	cv::Size dilate_kernel{3, 1};
-	cv::Size erode_kernel{3, 3};
-	algorithm_t algo_t = ALGO_DIFF;
-	cv::Mat img;
-	cv::Mat img_threshold;
-	std::vector<cv::Rect> regions;
-	ImgParams() {};
-	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a ): threshold(t), dilate(d), dilate_kernel(d_kernel), erode_kernel(e_kernel), algo_t(a) {}
-	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param )
-	{
-		ostr << "[" << param.threshold << "," << param.dilate << "] " << param.dilate_kernel << param.erode_kernel << " regions = " << param.regions.size();
-		return ostr;
-	}
-// 	int get_threshold() const { return threshold; }
-// 	int get_dilate() const { return dilate; }
-// 	cv::Size get_d_kernel() const { return dilate_kernel; }
-// 	cv::Size get_e_kernel() const { return erode_kernel; }
-// 	algorithm_t get_algo() const { return algo_t; }
-// 	~ImgParams() {};
-};
+
+}
+
+ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a ): threshold(t), dilate(d), dilate_kernel(d_kernel), erode_kernel(e_kernel), algo_t(a)
+{
+
+}
+
+// friend std::ostream& ImgParams::operator<< ( std::ostream& ostr, const ImgParams& param )
+// {
+// 	ostr << "[" << param.threshold << "," << param.dilate << "] " << param.dilate_kernel << param.erode_kernel << " regions = " << param.regions.size();
+// 	return ostr;
+// }
+
 
 places_t places;
 std::mutex mutex_push;
@@ -136,7 +127,6 @@ void hide_text( cv::Mat& img )
 		cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
 }
 
-
 bool identify_text( const cv::Mat img, int idx )
 {
 	bool ret = false;
@@ -206,25 +196,27 @@ std::vector<std::vector<cv::Point>> get_contours( const cv::Mat img )
 	return contours;
 }
 
-cv::Mat get_threshold_zero( const cv::Mat img, int value )
+// cv::Mat get_threshold_zero( const cv::Mat img, int value )
+// cv::gpu::GpuMat get_threshold_zero( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
+void get_threshold_zero( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
 {
-	cv::Mat img_threshold;
-	cv::threshold( img, img_threshold, value, 255, CV_THRESH_TOZERO );
-	return img_threshold;
+	// cv::Mat img_threshold;
+	cv::gpu::threshold( img, img_threshold, value, 255, CV_THRESH_TOZERO );
+	// return img_threshold;
 }
 
-cv::Mat get_threshold_bin( const cv::Mat img, int value )
+// cv::Mat get_threshold_bin( const cv::Mat img, int value )
+void get_threshold_bin( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
 {
-	cv::Mat img_threshold;
-	cv::threshold( img, img_threshold, value, 255, CV_THRESH_BINARY );
-	return img_threshold;
+	// cv::Mat img_threshold;
+	cv::gpu::threshold( img, img_threshold, value, 255, CV_THRESH_BINARY );
+	// return img_threshold;
 }
 
-cv::Mat get_diff( const cv::Mat frame1, const cv::Mat frame2 )
+// cv::Mat get_diff( const cv::Mat frame1, const cv::Mat frame2 )
+void get_diff( const cv::gpu::GpuMat frame1, const cv::gpu::GpuMat frame2, cv::gpu::GpuMat& img_diff )
 {
-	cv::Mat img_diff;
-	cv::absdiff( frame1, frame2, img_diff );
-	return img_diff;
+	cv::gpu::absdiff( frame1, frame2, img_diff );
 }
 
 cv::Mat get_dilated( const cv::Mat img, int dilation, cv::Size kernel_size )
@@ -250,18 +242,23 @@ cv::Mat get_cropped( cv::Mat input, const cv::Rect& box )
 	return cropped;
 }
 
-cv::Mat get_bitand_diff( const cv::Mat img1, const cv::Mat img2 )
+// cv::Mat get_bitand_diff( const cv::Mat img1, const cv::Mat img2 )
+cv::gpu::GpuMat get_bitand_diff( ImgParams& param, GPUVARS* g )
 {
-	cv::Mat img_bitand;
-	auto blacked1 = get_threshold_zero( img1, 220 );
-	auto blacked2 = get_threshold_zero( img2, 220 );
+	// cv::Mat img_bitand;
+	// cv::gpu::GpuMat img_bitand;
 
-	// cv::imshow( "blacked2", blacked2 );
+	get_threshold_zero( g->frame_prev_gray, param.gpu_blacked_prev, 220 );
+	get_threshold_zero( g->frame_curr_gray, param.gpu_blacked_curr, 220 );
 
-	auto img_diff = get_diff( blacked1, blacked2 );
+	// cv::imshow( "blacked_curr", blacked_curr );
+
+	get_diff( param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img_diff );
 	// cv::imshow( "img_diff", img_diff );
-	cv::bitwise_and( blacked2, img_diff, img_bitand );
-	return img_bitand;
+	cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img_bitand );
+
+	// param.gpu_img_bitand.download(img_bitand);
+	return param.gpu_img_bitand;
 }
 
 void set_black( cv::Mat& img )
@@ -337,17 +334,22 @@ void del_small_areas( cv::Mat& img )
 // 	return ((double)roi_intersect.area() / roi.area() >= 0.9 );
 // }
 
-bool find_places_by_size( ImgParams& param, const cv::Mat frame_prev_gray, const cv::Mat frame_curr_gray )
+// bool find_places_by_size( ImgParams& param, const cv::Mat frame_prev_gray, const cv::Mat frame_curr_gray )
+bool find_places_by_size( ImgParams& param, GPUVARS* g )
 {
-	param.img = (param.algo_t == ALGO_DIFF) ? get_bitand_diff( frame_prev_gray, frame_curr_gray ) : frame_curr_gray.clone();
+	// param.img = (param.algo_t == ALGO_DIFF) ? get_bitand_diff( g->gpu_frame_prev_gray, g->gpu_frame_curr_gray ) : g->gpu_frame_curr_gray.clone();
+	param.gpu_img = (param.algo_t == ALGO_DIFF) ? get_bitand_diff( param, g ) : g->frame_curr_gray.clone();
+	param.gpu_img.download(param.img);
 	del_small_areas( param.img );
-	// cv::imshow( "img_threshold", param.img );
-	param.img_threshold = get_threshold_bin( param.img, param.threshold );
-	// cv::imshow( "img_threshold", param.img_threshold );
+
+	// param.img_threshold = get_threshold_bin( param.img, param.threshold );
+	get_threshold_bin( param.gpu_img, param.gpu_img_threshold param.threshold );
+	param.gpu_img_threshold.download(param.img_threshold);
+
 	cv::Mat img_eroded = get_eroded( param.img_threshold, param.erode_kernel );
-	// cv::imshow( "img_eroded", img_eroded );
+
 	cv::Mat img_dilated = get_dilated( img_eroded, param.dilate, param.dilate_kernel );
-	// cv::imshow( "img_dilated1", img_dilated );
+
 	param.regions = std::move(find_text_regions( img_dilated ));
 	return true;
 }
@@ -392,22 +394,15 @@ bool find_places_by_text( const cv::Mat img, const cv::Mat img_threshold, const 
 	return false;
 }
 
-bool find_places_entry( cv::Mat& frame_prev_gray, cv::Mat& frame_curr_gray )
+// bool find_places_entry( cv::Mat& frame_prev_gray, cv::Mat& frame_curr_gray )
+bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 {
-	std::vector<ImgParams> params = {
-		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
-		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
-		// { 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
-		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
-		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
-		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
-	};
-
 	std::vector<std::future<bool>> futures;
 
 	for( auto& param: params )
 	{
-		futures.push_back( std::async( find_places_by_size, std::ref(param), frame_prev_gray, frame_curr_gray ) );
+		// futures.push_back( std::async( find_places_by_size, std::ref(param), gpu_frame_prev_gray, gpu_frame_curr_gray ) );
+		futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
 	}
 
 	for( auto f = futures.begin(); f != futures.end(); ++f )
@@ -447,38 +442,43 @@ bool find_places_entry( cv::Mat& frame_prev_gray, cv::Mat& frame_curr_gray )
 	return true;
 }
 
-cv::Mat img_prev_gray, img_curr_gray;
+// cv::Mat img_prev_gray, img_curr_gray;
 
-void img_detect_label( cv::Mat& frame_curr )
+// void img_detect_label( cv::Mat& frame_curr )
+void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	auto beg = cv::getTickCount();
 	// cv::Mat frame_prev_gray, frame_curr_gray;
-
-	if( !frame_curr.empty() )
+	if( g )
 	{
-		// cv::cvtColor( frame_curr, img_curr_gray, CV_BGR2GRAY );
-		cv::gpu::cvtColor( frame_curr, img_curr_gray, CV_BGR2GRAY );
-		if( !img_prev_gray.empty() )
+		if( !frame_curr.empty() )
 		{
-			find_places_entry( img_prev_gray, img_curr_gray );
-
-			if( places.size() )
+			g->frame_curr.upload(frame_curr);
+			// cv::cvtColor( frame_curr, img_curr_gray, CV_BGR2GRAY );
+			cv::gpu::cvtColor( g->frame_curr, g->frame_curr_gray, CV_BGR2GRAY );
+			if( !g->frame_prev_gray.empty() )
 			{
-				draw_rectangle( frame_curr, *places.rbegin() );
-			}
-			// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
-		// 	// cv::imshow( "detector", frame_curr );
-		// 	// if( cv::waitKey(1) == 27 )
-		// 	// 	;
-		}
-	}
-	img_prev_gray = img_curr_gray.clone();
+				// find_places_entry( g->gpu_frame_prev_gray, g->gpu_frame_curr_gray );
+				find_places_entry( params, g );
 
-	double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
-	if( frame_tm > 30 )
-		std::cout << " \tframe_tm = " << frame_tm << std::endl;
+				if( places.size() )
+				{
+					draw_rectangle( frame_curr, *places.rbegin() );
+				}
+				// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
+			// 	// cv::imshow( "detector", frame_curr );
+			// 	// if( cv::waitKey(1) == 27 )
+			// 	// 	;
+			}
+		}
+		// img_prev_gray = img_curr_gray.clone();
+		g->frame_prev_gray = g->frame_curr_gray.clone();
+
+		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
+		// if( frame_tm > 30 )
+			std::cout << " \tframe_tm = " << frame_tm << std::endl;
+	}
 	// cv::destroyAllWindows();
-	return;
 }
 
 void img_draw_rect( cv::Mat& frame_curr )

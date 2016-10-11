@@ -32,8 +32,40 @@ enum algorithm_t
 	ALGO_CURRENT
 };
 
+typedef struct _GPUVARS_S
+{
+	cv::gpu::GpuMat frame_curr;
+	cv::gpu::GpuMat frame_prev;
+	cv::gpu::GpuMat frame_curr_gray;
+	cv::gpu::GpuMat frame_prev_gray;
+} GPUVARS;
+
+class ImgParams
+{
+public:
+	int threshold = 0;
+	int dilate = 0;
+	cv::Size dilate_kernel{3, 1};
+	cv::Size erode_kernel{3, 3};
+	algorithm_t algo_t = ALGO_DIFF;
+	cv::Mat img;
+	cv::Mat img_threshold;
+	cv::gpu::GpuMat gpu_img;
+	cv::gpu::GpuMat gpu_img_threshold;
+	cv::gpu::GpuMat gpu_blacked_prev;
+	cv::gpu::GpuMat gpu_blacked_curr;
+	cv::gpu::GpuMat gpu_img_diff;
+	cv::gpu::GpuMat gpu_img_bitand;
+	// cv::gpu::GpuMat gpu_img_th;
+	std::vector<cv::Rect> regions;
+	ImgParams();
+	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a );
+	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param );
+};
+
 void tesseract_init();
-void img_detect_label( cv::Mat& frame_curr );
+// void img_detect_label( cv::Mat& frame_curr, GPUVARS& g );
+void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g );
 void img_draw_rect( cv::Mat& frame_curr );
 
 #endif

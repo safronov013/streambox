@@ -232,6 +232,7 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 							if( avstream_copy_codec_ctx( in_stream, ctx->v_stream, (out_fmt->flags & AVFMT_GLOBALHEADER) ) == true )
 							{
 								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
+								// if( true )
 								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
 									av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
 								{
@@ -246,14 +247,10 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 									ctx->v_stream->codec->gop_size = 10;
 									ctx->v_stream->codec->max_b_frames = 1;
 									ctx->v_stream->codec->time_base = ctx->v_stream->time_base = {1, 25};
-									// if( nvenc_encode_init(ctx->v_stream->codec) >=0 )
+									if( avcodec_open2( ctx->v_stream->codec, vcodec, NULL ) >= 0 )
 									{
-										if( avcodec_open2( ctx->v_stream->codec, vcodec, NULL ) >= 0 )
-										{
-										}
-										else perror( "avcodec_open2()" );
 									}
-									// else perror( "nvenc_encode_init()" );
+									else perror( "avcodec_open2()" );
 								}
 								else perror( "av_opt_set()" );
 							}

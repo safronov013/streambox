@@ -64,16 +64,17 @@ AVFrame* cvmat_2_avframe( cv::Mat* img )
 	return avframe_dst;
 }
 
-void avframe_update( AVFrame* frame )
+void avframe_update( AVFrame* frame, GPUVARS* g, std::vector<ImgParams>& params )
 {
-	if( frame )
+	if( frame && g )
 	{
 		avframe_2_cvmat( frame );
 		// auto frame_curr = cvframe.clone();
-		img_draw_rect(cvframe);
+		
+		// img_draw_rect(cvframe);
 		// cv::imshow( "img", cvframe );
 		// cv::waitKey(1);
-		// // img_detect_label( cvframe );
+		img_detect_label( cvframe, params, g );
 		cvmat_2_avframe(&cvframe);
 	}
 }
@@ -88,9 +89,18 @@ int main( int argc, char* argv[] )
 	char* source = argv[1];
 	char* destination = argv[2];
 
-	// tesseract_init();
+	tesseract_init();
 	avstream_init();
 
+	GPUVARS g;
+	std::vector<ImgParams> params = {
+		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		{ 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		{ 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
+		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
+		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
+		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
+	};
 	AVSTREAMCTX ctx;
 	memset( &ctx, 0, sizeof(ctx) );
 
@@ -110,7 +120,7 @@ int main( int argc, char* argv[] )
 						av_init_packet(&out_pkt); out_pkt.data = NULL; out_pkt.size = 0;
 						if( pkt.stream_index == ctx.v_idx )
 						{
-							avframe_update(ctx.frame);
+							avframe_update( ctx.frame, &g, params );
 							if( avstream_encode_video_packet( &ctx, &out_pkt, avframe_dst ) )
 							{
 								// if( avstream_write_packet2( &ctx, &out_pkt ) )

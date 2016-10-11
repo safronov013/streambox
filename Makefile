@@ -18,6 +18,7 @@ DEPLIBS=tesseract\
 	opencv_core\
 	opencv_imgproc\
 	opencv_highgui\
+	opencv_gpu\
 	pthread\
 	z\
 	x264\
