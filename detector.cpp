@@ -7,14 +7,21 @@
 #include "detector.h"
 
 
+cv::Mat g_tmp;
+
+
 ImgParams::ImgParams()
 {
 
 }
 
-ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a ): threshold(t), dilate(d), dilate_kernel(d_kernel), erode_kernel(e_kernel), algo_t(a)
+ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a ): threshold(t), dilate(d), dilate_kernel_size(d_kernel), erode_kernel_size(e_kernel), algo_t(a)
 {
+	cv::Mat dilate_kernel = cv::getStructuringElement( cv::MORPH_CROSS, dilate_kernel_size );
+	cv::Mat erode_kernel = cv::getStructuringElement( cv::MORPH_CROSS, erode_kernel_size );
 
+	// regions.reserve(32);
+	// contours.reserve(1028);
 }
 
 // friend std::ostream& ImgParams::operator<< ( std::ostream& ostr, const ImgParams& param )
@@ -127,7 +134,7 @@ void hide_text( cv::Mat& img )
 		cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
 }
 
-bool identify_text( const cv::Mat img, int idx )
+bool identify_text( const cv::Mat& img, int idx )
 {
 	bool ret = false;
 
@@ -189,51 +196,67 @@ void draw_contours( std::vector<std::vector<cv::Point>> contours, cv::Size size 
 	cv::imshow( "contours", image );
 }
 
-std::vector<std::vector<cv::Point>> get_contours( const cv::Mat img )
+inline void get_contours( const cv::Mat& img, std::vector<std::vector<cv::Point>>& contours )
 {
-	std::vector<std::vector<cv::Point>> contours;
+	// std::vector<std::vector<cv::Point>> contours;
 	cv::findContours( img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE );
-	return contours;
+	// return contours;
 }
 
 // cv::Mat get_threshold_zero( const cv::Mat img, int value )
 // cv::gpu::GpuMat get_threshold_zero( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
-void get_threshold_zero( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
+inline void get_threshold_zero( const cv::gpu::GpuMat& img, cv::gpu::GpuMat& img_threshold, int value )
 {
 	// cv::Mat img_threshold;
 	cv::gpu::threshold( img, img_threshold, value, 255, CV_THRESH_TOZERO );
 	// return img_threshold;
 }
 
+inline void get_threshold_zero( const cv::Mat& img, cv::Mat& img_threshold, int value )
+{
+	cv::threshold( img, img_threshold, value, 255, CV_THRESH_TOZERO );
+}
+
 // cv::Mat get_threshold_bin( const cv::Mat img, int value )
-void get_threshold_bin( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
+inline void get_threshold_bin( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
 {
 	// cv::Mat img_threshold;
 	cv::gpu::threshold( img, img_threshold, value, 255, CV_THRESH_BINARY );
 	// return img_threshold;
 }
 
+inline void get_threshold_bin( const cv::Mat& img, cv::Mat& img_threshold, int value )
+{
+	cv::threshold( img, img_threshold, value, 255, CV_THRESH_BINARY );
+}
+
 // cv::Mat get_diff( const cv::Mat frame1, const cv::Mat frame2 )
-void get_diff( const cv::gpu::GpuMat frame1, const cv::gpu::GpuMat frame2, cv::gpu::GpuMat& img_diff )
+inline void get_diff( const cv::gpu::GpuMat frame1, const cv::gpu::GpuMat frame2, cv::gpu::GpuMat& img_diff )
 {
 	cv::gpu::absdiff( frame1, frame2, img_diff );
 }
 
-cv::Mat get_dilated( const cv::Mat img, int dilation, cv::Size kernel_size )
+inline void get_dilated( const cv::gpu::GpuMat& img, cv::gpu::GpuMat& img_dilated, int dilation, const cv::Mat& kernel )
 {
-	cv::Mat dilated;
-	cv::Mat kernel = cv::getStructuringElement( cv::MORPH_CROSS, kernel_size );
-	cv::dilate( img, dilated, kernel, cv::Point(-1,-1), dilation );
-	return dilated;
+	cv::gpu::dilate( img, img_dilated, kernel, cv::Point(-1,-1), dilation );
 }
 
-cv::Mat get_eroded( const cv::Mat& img, const cv::Size& kernel_size )
+inline void get_dilated( const cv::Mat& img, cv::Mat& img_dilated, int dilation, const cv::Mat& kernel )
 {
-	cv::Mat eroded;
-	cv::Mat kernel = cv::getStructuringElement( cv::MORPH_CROSS, kernel_size );
-	cv::erode( img, eroded, kernel );
-	return eroded;
+	cv::dilate( img, img_dilated, kernel, cv::Point(-1,-1), dilation );
 }
+
+// cv::Mat get_eroded( const cv::Mat& img, const cv::Size& kernel_size )
+inline void get_eroded( const cv::gpu::GpuMat& img, cv::gpu::GpuMat& img_eroded, const cv::Mat& kernel )
+{
+	cv::gpu::erode( img, img_eroded, kernel );
+}
+
+inline void get_eroded( const cv::Mat& img, cv::Mat& img_eroded, const cv::Mat& kernel )
+{
+	cv::erode( img, img_eroded, kernel );
+}
+
 
 cv::Mat get_cropped( cv::Mat input, const cv::Rect& box )
 {
@@ -243,22 +266,15 @@ cv::Mat get_cropped( cv::Mat input, const cv::Rect& box )
 }
 
 // cv::Mat get_bitand_diff( const cv::Mat img1, const cv::Mat img2 )
-cv::gpu::GpuMat get_bitand_diff( ImgParams& param, GPUVARS* g )
+// cv::gpu::GpuMat get_bitand_diff( ImgParams& param, GPUVARS* g )
+void get_bitand_diff( ImgParams& param, GPUVARS* g )
 {
-	// cv::Mat img_bitand;
-	// cv::gpu::GpuMat img_bitand;
-
-	get_threshold_zero( g->frame_prev_gray, param.gpu_blacked_prev, 220 );
-	get_threshold_zero( g->frame_curr_gray, param.gpu_blacked_curr, 220 );
-
-	// cv::imshow( "blacked_curr", blacked_curr );
-
-	get_diff( param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img_diff );
-	// cv::imshow( "img_diff", img_diff );
-	cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img_bitand );
-
-	// param.gpu_img_bitand.download(img_bitand);
-	return param.gpu_img_bitand;
+	cv::gpu::threshold( g->frame_prev_gray, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
+	cv::gpu::threshold( g->frame_curr_gray, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
+	cv::gpu::absdiff( param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img_diff );
+	// cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img_bitand );
+	cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img );
+	// return param.gpu_img_bitand;
 }
 
 void set_black( cv::Mat& img )
@@ -270,15 +286,17 @@ void set_black( cv::Mat& img )
 	}
 }
 
-std::vector<cv::Rect> find_text_regions( cv::Mat img )
+// void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std::vector<std::vector<cv::Point>>& contours )
+std::vector<cv::Rect> find_text_regions( const cv::Mat& img )
 {
+	std::vector<cv::Rect> regions;
+	std::vector<std::vector<cv::Point>> contours;
 	cv::Mat img_clone = img.clone();
-	std::vector<cv::Rect> areas;
-	// return areas;
-	std::vector<std::vector<cv::Point>> contours = get_contours( img_clone );
 
+	get_contours( img_clone, contours );
+	std::cout << "contours.size() = " << contours.size() << std::endl;
 	// draw_contours( contours, img.size() );
-	// std::cout << "contours.size() = " << contours.size() << std::endl;
+
 	for( auto contour: contours )
 	{
 		auto rotated_box = cv::minAreaRect(contour);
@@ -286,29 +304,30 @@ std::vector<cv::Rect> find_text_regions( cv::Mat img )
 		{
 			auto box = rotated_box.boundingRect();
 
-			if( box.width >= 171 && box.width <= 223 && box.height >= 17 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
-			{
-				// std::cout << "box = " << box << std::endl;
-			}
+			// if( box.width >= 171 && box.width <= 223 && box.height >= 17 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			// {
+			// 	// std::cout << "box = " << box << std::endl;
+			// }
 			if( box.width >= 171 && box.width <= 223 && box.height >= 17 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
 				// if( box.width > 220 ) box.width = 210;
 				if( box.height > 40 ) box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					// std::cout << "box = " << box << std::endl;
-					areas.push_back(box);
+					std::cout << "box = " << box << std::endl;
+					regions.push_back(box);
 				}
 			}
 		}
 	}
-	return areas;
+	return regions;
 }
 
-void del_small_areas( cv::Mat& img )
+void del_small_areas( const cv::Mat& img )
 {
 	cv::Mat img_clone = img.clone();
-	std::vector<std::vector<cv::Point>> contours = get_contours( img_clone );
+	std::vector<std::vector<cv::Point>> contours;
+	get_contours( img_clone, contours );
 	int deleted = 0;
 
 	for( auto contour: contours )
@@ -322,6 +341,7 @@ void del_small_areas( cv::Mat& img )
 			{
 				cv::Mat tmp = img(box);
 				set_black( tmp );
+				// set_black( img(box) );
 			}
 		}
 	}
@@ -338,24 +358,53 @@ void del_small_areas( cv::Mat& img )
 bool find_places_by_size( ImgParams& param, GPUVARS* g )
 {
 	// param.img = (param.algo_t == ALGO_DIFF) ? get_bitand_diff( g->gpu_frame_prev_gray, g->gpu_frame_curr_gray ) : g->gpu_frame_curr_gray.clone();
-	param.gpu_img = (param.algo_t == ALGO_DIFF) ? get_bitand_diff( param, g ) : g->frame_curr_gray.clone();
-	param.gpu_img.download(param.img);
-	del_small_areas( param.img );
+	if( param.algo_t == ALGO_DIFF )
+	{
+		get_bitand_diff( param, g );
+		param.gpu_img.download(param.img);
+	}
+	else
+	{
+		// param.gpu_img = g->frame_curr_gray.clone();
+		g->frame_curr_gray.download(param.img);
+	}
 
-	// param.img_threshold = get_threshold_bin( param.img, param.threshold );
-	get_threshold_bin( param.gpu_img, param.gpu_img_threshold param.threshold );
+	// del_small_areas( param.img );
+
+	// get_threshold_bin( param.img, param.img_threshold, param.threshold );
+	// get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
+	cv::gpu::threshold( param.gpu_img, param.gpu_img_threshold, param.threshold, 255, CV_THRESH_BINARY );
 	param.gpu_img_threshold.download(param.img_threshold);
 
-	cv::Mat img_eroded = get_eroded( param.img_threshold, param.erode_kernel );
+	// cv::Mat img_eroded;
+	// get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
+	cv::erode( param.img_threshold, param.img_eroded, param.erode_kernel );
+	// get_eroded( param.gpu_img_threshold, param.gpu_img_eroded, param.erode_kernel );
+	// param.gpu_img_eroded.download(param.img_eroded);
 
-	cv::Mat img_dilated = get_dilated( img_eroded, param.dilate, param.dilate_kernel );
+	// cv::dilate( param.img_eroded, param.img_dilated, param.dilate_kernel, cv::Point(-1,-1), param.dilate );
+	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
+	// get_dilated( param.gpu_img_eroded, param.gpu_img_dilated, param.dilate, param.dilate_kernel );
+	// param.gpu_img_dilated.download(param.img_dilated);
+	// return false;
 
-	param.regions = std::move(find_text_regions( img_dilated ));
+	// param.regions = std::move(find_text_regions( param.img_dilated ));
+	// param.regions = std::move(find_text_regions( param.img_dilated ));
+
+	// param.regions.erase( param.regions.begin(), param.regions.end() );
+	// param.contours.erase( param.contours.begin(), param.contours.end() );
+
+	// cv::imshow( "threshold", param.img_threshold );
+	// cv::imshow( "dilated", param.img_dilated );
+	// cv::waitKey(100);
+
+	// find_text_regions( param.img_dilated, param.regions, param.contours );
+	param.regions = std::move( find_text_regions(param.img_dilated) );
 	return true;
 }
 
 // places_t find_places_by_text( const cv::Mat img, const cv::Mat img_threshold, const cv::Rect roi )
-bool find_places_by_text( const cv::Mat img, const cv::Mat img_threshold, const cv::Rect roi, int ocr_idx )
+bool find_places_by_text( const cv::Mat& img, const cv::Mat& img_threshold, const cv::Rect& roi, int ocr_idx )
 {
 	if( !is_founded( roi ) )
 	{
@@ -368,6 +417,7 @@ bool find_places_by_text( const cv::Mat img, const cv::Mat img_threshold, const 
 		// cv::imshow( "img_roi_threshold", img_roi_threshold );
 		// cv::waitKey(500);
 		// if( identify_text( img_roi_threshold, ocr_idx ) )
+		// if( identify_text( img_roi, ocr_idx ) )
 		if( identify_text( img_roi, ocr_idx ) )
 		{
 			mutex_push.lock();
@@ -415,6 +465,8 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	int ocr_idx = 0;
 	for( auto param: params )
 	{
+		// std::cout << "param.regions.size() = " << param.regions.size() << std::endl;
+
 		for( auto roi: param.regions )
 		{
 			auto it = std::find_if( regions.begin(), regions.end(), [=] (cv::Rect r) {
@@ -445,8 +497,15 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 // cv::Mat img_prev_gray, img_curr_gray;
 
 // void img_detect_label( cv::Mat& frame_curr )
+
+double tm_full = 0;
+int frame_cnt = 0;
+
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
+	// g_tmp = frame_curr;
+
+	if(++frame_cnt < 0) return;
 	auto beg = cv::getTickCount();
 	// cv::Mat frame_prev_gray, frame_curr_gray;
 	if( g )
@@ -475,8 +534,22 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		g->frame_prev_gray = g->frame_curr_gray.clone();
 
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
-		// if( frame_tm > 30 )
-			std::cout << " \tframe_tm = " << frame_tm << std::endl;
+		tm_full += frame_tm;
+		// if( frame_tm > 40 )
+		// 	std::cout << " \tframe_tm = " << frame_tm << std::endl;
+
+		if( frame_cnt % 50 != 0 );
+		else
+		{
+			std::cout << frame_cnt << "   " << tm_full << std::endl;
+		}
+
+		// if( frame_cnt != 100 );
+		// else
+		// {
+		// 	std::cout << ++frame_cnt << " " << tm_full << std::endl;
+		// 	exit(1);
+		// }
 	}
 	// cv::destroyAllWindows();
 }
