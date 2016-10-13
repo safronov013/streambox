@@ -63,8 +63,7 @@ public:
 	cv::gpu::GpuMat gpu_img_eroded;
 	cv::gpu::GpuMat gpu_img_dilated;
 	std::vector<cv::Rect> regions;
-	// std::vector<cv::Rect> areas;
-	// std::vector<std::vector<cv::Point>> contours;
+	std::vector<std::vector<cv::Point>> contours;
 	ImgParams();
 	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a );
 	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param );
