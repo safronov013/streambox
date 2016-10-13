@@ -17,8 +17,8 @@ ImgParams::ImgParams()
 
 ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a ): threshold(t), dilate(d), dilate_kernel_size(d_kernel), erode_kernel_size(e_kernel), algo_t(a)
 {
-	cv::Mat dilate_kernel = cv::getStructuringElement( cv::MORPH_CROSS, dilate_kernel_size );
-	cv::Mat erode_kernel = cv::getStructuringElement( cv::MORPH_CROSS, erode_kernel_size );
+	dilate_kernel = cv::getStructuringElement( cv::MORPH_CROSS, dilate_kernel_size );
+	erode_kernel = cv::getStructuringElement( cv::MORPH_CROSS, erode_kernel_size );
 
 	// regions.reserve(32);
 	// contours.reserve(1028);
@@ -369,7 +369,7 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 		g->frame_curr_gray.download(param.img);
 	}
 
-	// del_small_areas( param.img );
+	del_small_areas( param.img );
 
 	// get_threshold_bin( param.img, param.img_threshold, param.threshold );
 	// get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
@@ -504,8 +504,9 @@ int frame_cnt = 0;
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	// g_tmp = frame_curr;
+	++frame_cnt;
 
-	if(++frame_cnt < 0) return;
+	if( frame_cnt < 200 ) return;
 	auto beg = cv::getTickCount();
 	// cv::Mat frame_prev_gray, frame_curr_gray;
 	if( g )
