@@ -7,7 +7,7 @@
 #include "detector.h"
 
 
-cv::Mat g_tmp;
+int frame_cnt = 0;
 
 
 ImgParams::ImgParams()
@@ -31,7 +31,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 // }
 
 
-places_t places;
+// places_t places;
 std::mutex mutex_push;
 int g_frame_pos = 0;
 std::string searched_str("");
@@ -138,9 +138,21 @@ bool identify_text( const cv::Mat& img, int idx )
 {
 	bool ret = false;
 
+	double beg = (double)cv::getTickCount();
+
 	ocr[idx].SetImage( img.data, img.cols, img.rows, 1, img.step );
 	std::string str = ocr[idx].GetUTF8Text();
 	double alpha_digit = 0;
+	double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
+
+	if( frame_tm > 60 ) return false;
+
+	// std::cout << "identify_tm = " << frame_tm << std::endl;
+	// if( frame_tm > 30 )
+	// {
+	// 	cv::imshow( "id", img );
+	// 	cv::waitKey(100);
+	// }
 
 	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n'); } );
 	if( new_end != str.end() )
@@ -161,7 +173,7 @@ bool identify_text( const cv::Mat& img, int idx )
 		{
 			// if( str.size() == 8 && alpha_digit/str.size() == 1 )
 			// 	searched_str = str;
-			std::cout << str << "  " << alpha_digit << std::endl;
+			std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
 	}
 	// if( str.size() == 0 )
@@ -173,12 +185,15 @@ bool identify_text( const cv::Mat& img, int idx )
 	return ret;
 }
 
-bool is_founded( const cv::Rect& box )
+bool is_founded( const places_t& places, const cv::Rect& box )
 {
 	for( auto place: places )
 	{
 		auto roi_intersect = place & box;
-		if( (double)roi_intersect.area() / place.area() >= 0.9 )
+		double prop = (double)roi_intersect.area() / place.area();
+		if( prop > 0.7 )
+			std::cout << "prop = " << prop << std::endl;
+		if( prop >= 0.9 )
 			return true;
 	}
 	return false;
@@ -201,13 +216,9 @@ inline void get_contours( const cv::Mat& img, std::vector<std::vector<cv::Point>
 	cv::findContours( img, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE );
 }
 
-// cv::Mat get_threshold_zero( const cv::Mat img, int value )
-// cv::gpu::GpuMat get_threshold_zero( const cv::gpu::GpuMat img, cv::gpu::GpuMat& img_threshold, int value )
 inline void get_threshold_zero( const cv::gpu::GpuMat& img, cv::gpu::GpuMat& img_threshold, int value )
 {
-	// cv::Mat img_threshold;
 	cv::gpu::threshold( img, img_threshold, value, 255, CV_THRESH_TOZERO );
-	// return img_threshold;
 }
 
 inline void get_threshold_zero( const cv::Mat& img, cv::Mat& img_threshold, int value )
@@ -225,7 +236,6 @@ inline void get_threshold_bin( const cv::Mat& img, cv::Mat& img_threshold, int v
 	cv::threshold( img, img_threshold, value, 255, CV_THRESH_BINARY );
 }
 
-// cv::Mat get_diff( const cv::Mat frame1, const cv::Mat frame2 )
 inline void get_diff( const cv::gpu::GpuMat frame1, const cv::gpu::GpuMat frame2, cv::gpu::GpuMat& img_diff )
 {
 	cv::gpu::absdiff( frame1, frame2, img_diff );
@@ -305,7 +315,7 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 				if( box.height > 40 ) box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					std::cout << "box = " << box << std::endl;
+					// std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -339,73 +349,54 @@ void del_small_areas( const cv::Mat& img )
 	return;
 }
 
-// bool is_identical( cv::Rect r1, cv::Rect r2 )
-// {
-// 	auto roi_intersect = r & roi;
-// 	return ((double)roi_intersect.area() / roi.area() >= 0.9 );
-// }
-
 // bool find_places_by_size( ImgParams& param, const cv::Mat frame_prev_gray, const cv::Mat frame_curr_gray )
 bool find_places_by_size( ImgParams& param, GPUVARS* g )
 {
 	if( param.algo_t == ALGO_DIFF )
 	{
 		get_bitand_diff( param, g );
-		param.gpu_img.download(param.img);
 	}
 	else
-		g->frame_curr_gray.download(param.img);
+		param.gpu_img = g->frame_curr_gray.clone();
+	param.gpu_img.download(param.img);
 
 	del_small_areas( param.img );
 
 	get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
-	// cv::gpu::threshold( param.gpu_img, param.gpu_img_threshold, param.threshold, 255, CV_THRESH_BINARY );
 	param.gpu_img_threshold.download(param.img_threshold);
 
 	get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
-	// cv::erode( param.img_threshold, param.img_eroded, param.erode_kernel );
-
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
-	// get_dilated( param.gpu_img_eroded, param.gpu_img_dilated, param.dilate, param.dilate_kernel );
-	// param.gpu_img_dilated.download(param.img_dilated);
-	// return false;
-
-	// param.regions = std::move(find_text_regions( param.img_dilated ));
-	// param.regions = std::move(find_text_regions( param.img_dilated ));
 
 	param.regions.erase( param.regions.begin(), param.regions.end() );
 	param.contours.erase( param.contours.begin(), param.contours.end() );
 
-	// cv::imshow( "threshold", param.img_threshold );
-	// cv::imshow( "dilated", param.img_dilated );
-	// cv::waitKey(100);
-
 	find_text_regions( param.img_dilated, param.regions, param.contours );
-	// param.regions = std::move( find_text_regions(param.img_dilated) );
+
 	return true;
 }
 
-// places_t find_places_by_text( const cv::Mat img, const cv::Mat img_threshold, const cv::Rect roi )
-bool find_places_by_text( const cv::Mat& img, const cv::Mat& img_threshold, const cv::Rect& roi, int ocr_idx )
+// bool find_places_by_text( const cv::Mat& img, const cv::Mat& img_threshold, const cv::Rect& roi, int ocr_idx, places_t& param_places )
+// bool find_places_by_text( const cv::Mat& img, const cv::Mat& img_threshold, const cv::Rect& roi, int ocr_idx, places_t* param_places )
+bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 {
-	if( !is_founded( roi ) )
+	if( !is_founded( param.places, roi ) )
 	{
-		auto img_roi = img(roi);
+		auto img_roi = param.img(roi);
 		// auto img_roi = get_threshold_bin( img(roi), 20 );
-		auto img_roi_threshold = img_threshold(roi);
+		auto img_roi_threshold = param.img_threshold(roi);
 
-		// if( identify_text( img_roi ) || identify_text( img_roi_threshold ) )
-		// cv::imshow( "img_roi", img_roi );
-		// cv::imshow( "img_roi_threshold", img_roi_threshold );
-		// cv::waitKey(500);
-		// if( identify_text( img_roi_threshold, ocr_idx ) )
-		// if( identify_text( img_roi, ocr_idx ) )
 		if( identify_text( img_roi, ocr_idx ) )
 		{
+			cv::Rect roi2{ roi.x, roi.y, roi.width, roi.height };
+			if( roi2.x > 10 ) roi2.x -= 10;
+			if( roi2.y > 8 ) roi2.y -= 8;
+			if( roi2.width < 210 && (param.img.cols - roi2.x - 210) >= 0 ) roi2.width = 210;
+			if( roi2.height < 33 && (param.img.rows - roi2.y - 33) >= 0 ) roi2.height = 33;
 			mutex_push.lock();
-			places.push_back(roi);
+			param.places.push_back(roi2);
+			// places.push_back(roi2);
 			mutex_push.unlock();
-			std::cout << g_frame_pos << std::endl;
 			return true;
 		}
 		/*else if( roi.height > 32 )
@@ -443,9 +434,13 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	}
 	futures.clear();
 
+	// return true;
+
+	// std::vector<std::thread> th;
+
 	std::vector<cv::Rect> regions;
 	int ocr_idx = 0;
-	for( auto param: params )
+	for( auto& param: params )
 	{
 		// std::cout << "param.regions.size() = " << param.regions.size() << std::endl;
 
@@ -456,7 +451,9 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 																	} );
 			if( it == regions.end() && ocr_idx < OCR_MAX )
 			{
-				futures.push_back( std::async( find_places_by_text, param.img, param.img_threshold, roi, ocr_idx ) );
+				// futures.push_back( std::async( find_places_by_text, param.img, param.img_threshold, roi, ocr_idx, &param.places ) );
+				futures.push_back( std::async( find_places_by_text, std::ref(param), roi, ocr_idx ) );
+				// th.push_back( std::thread( find_places_by_text, std::ref(param), roi, ocr_idx ) );
 				++ocr_idx;
 				regions.push_back(roi);
 				// break;
@@ -465,13 +462,40 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	}
 
 	// if( regions.size() > 1 )
-	// 	std::cout << regions.size() << std::endl;
+	// std::cout << regions.size() << std::endl;
+	// for( auto r: regions )
+	// 	std::cout << r << " ";
+	// std::cout << std::endl;
+
+	// for( auto t = th.begin(); t != th.end(); ++t )
+	// 	t->join();
+
+	int i = 0;
 
 	for( auto f = futures.begin(); f != futures.end(); ++f )
 	{
-		bool is_found = f->get();
-		// if( is_found )
-		// 	std::cout << "is_found" << std::endl;
+		// ++i;
+		// double beg = (double)cv::getTickCount();
+		// // std::cout << "check" << std::endl;
+		// if( f->wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout )
+		// {
+		// 	if( f->wait_for(std::chrono::milliseconds(40)) == std::future_status::timeout )
+		// 		std::cout << i << " timeout" << std::endl;
+		// }
+		// double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
+		// std::cout << i << " " << frame_tm << std::endl;
+
+
+		// std::future_status status = f->wait_for(std::chrono::milliseconds(60));
+  //       if (status == std::future_status::deferred)
+  //       {
+  //           std::cout << "deferred\n";
+  //       } else if (status == std::future_status::timeout) {
+  //           std::cout << "timeout\n";
+  //       } else if (status == std::future_status::ready) {
+  //           std::cout << "ready!\n";
+  //       }
+		f->get();
 	}
 	return true;
 }
@@ -481,14 +505,16 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 // void img_detect_label( cv::Mat& frame_curr )
 
 double tm_full = 0;
-int frame_cnt = 0;
 
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	// g_tmp = frame_curr;
 	++frame_cnt;
 
-	if( frame_cnt < 200 ) return;
+	// if( frame_cnt < 426 ) return;
+
+	// std::cout << frame_cnt << std::endl;
+
 	auto beg = cv::getTickCount();
 	// cv::Mat frame_prev_gray, frame_curr_gray;
 	if( g )
@@ -503,9 +529,14 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 				// find_places_entry( g->gpu_frame_prev_gray, g->gpu_frame_curr_gray );
 				find_places_entry( params, g );
 
-				if( places.size() )
+				for( auto param: params )
 				{
-					draw_rectangle( frame_curr, *places.rbegin() );
+					if( param.places.size() )
+					{
+						draw_rectangle( frame_curr, *param.places.rbegin() );
+						// cv::Mat tmp = frame_curr(*param.places.rbegin());
+						// hide_text( tmp );
+					}
 				}
 				// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
 			// 	// cv::imshow( "detector", frame_curr );
@@ -519,20 +550,13 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 		tm_full += frame_tm;
 		// if( frame_tm > 40 )
-		// 	std::cout << " \tframe_tm = " << frame_tm << std::endl;
+			// std::cout << " \tframe_tm = " << frame_tm << std::endl;
 
 		if( frame_cnt % 50 != 0 );
 		else
 		{
 			std::cout << frame_cnt << "   " << tm_full << std::endl;
 		}
-
-		// if( frame_cnt != 100 );
-		// else
-		// {
-		// 	std::cout << ++frame_cnt << " " << tm_full << std::endl;
-		// 	exit(1);
-		// }
 	}
 	// cv::destroyAllWindows();
 }
