@@ -47,7 +47,7 @@ all: $(OBJECTS) $(LIBS) $(TARGET)
 $(TARGET):
 	echo $(CXX) $(CXXFLAGS) $@.cpp -o $@ $(LIBS) $(addprefix -l, $(DEPLIBS))
 	$(CXX) $(CXXFLAGS) $@.o -o $@ $(LIBS) $(addprefix -l, $(DEPLIBS)) $(addprefix -l, $(FFMPEGLIB))
-#	strip $@
+	strip $@
 #	bzip2 -kf --best $@
 #	$(LXX) $@.o -o $@ $(LIBS) $(addprefix -l, $(DEPLIBS)) -lstdc++ -lm -lsocket++
 

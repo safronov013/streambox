@@ -134,18 +134,36 @@ void hide_text( cv::Mat& img )
 		cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
 }
 
+std::string foo( const cv::Mat& img, int idx )
+{
+	ocr[idx].SetImage( img.data, img.cols, img.rows, 1, img.step );
+	// std::string str = ocr[idx].GetUTF8Text();
+	return ocr[idx].GetUTF8Text();
+}
+
+#include <pthread.h>
+
 bool identify_text( const cv::Mat& img, int idx )
 {
 	bool ret = false;
 
-	double beg = (double)cv::getTickCount();
+	// double beg = (double)cv::getTickCount();
+
+	// auto f = std::async( std::launch::async, foo, std::cref(img), idx );
+	// if( f.wait_for(std::chrono::milliseconds(5)) == std::future_status::timeout )
+	// {
+	// 	std::cout << "kill" << std::endl;
+	// 	return false;
+	// }
+	// std::string str = f.get();
+
 
 	ocr[idx].SetImage( img.data, img.cols, img.rows, 1, img.step );
 	std::string str = ocr[idx].GetUTF8Text();
+	// double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 	double alpha_digit = 0;
-	double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 
-	if( frame_tm > 60 ) return false;
+	// if( frame_tm > 60 ) return false;
 
 	// std::cout << "identify_tm = " << frame_tm << std::endl;
 	// if( frame_tm > 30 )
@@ -191,8 +209,8 @@ bool is_founded( const places_t& places, const cv::Rect& box )
 	{
 		auto roi_intersect = place & box;
 		double prop = (double)roi_intersect.area() / place.area();
-		if( prop > 0.7 )
-			std::cout << "prop = " << prop << std::endl;
+		// if( prop > 0.7 )
+		// 	std::cout << "prop = " << prop << std::endl;
 		if( prop >= 0.9 )
 			return true;
 	}
@@ -203,6 +221,12 @@ void draw_rectangle( cv::Mat& input, const cv::Rect& box )
 {
 	cv::rectangle( input, box.tl(), box.br(), CV_RGB(255,0,0), 2, 4 );
 }
+
+void draw_rectangle_green( cv::Mat& input, const cv::Rect& box )
+{
+	cv::rectangle( input, box.tl(), box.br(), CV_RGB(0,255,0), 2, 4 );
+}
+
 
 void draw_contours( std::vector<std::vector<cv::Point>> contours, cv::Size size )
 {
@@ -309,10 +333,11 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 			// {
 			// 	// std::cout << "box = " << box << std::endl;
 			// }
-			if( box.width >= 171 && box.width <= 223 && box.height >= 17 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			if( box.width >= 171 && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
 				// if( box.width > 220 ) box.width = 210;
-				if( box.height > 40 ) box.height = 30;
+				if( box.height <= 19 ) { box.y -= 2; box.height += 4; }
+				if( box.height > 40 ) 	box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
 					// std::cout << "box = " << box << std::endl;
@@ -380,7 +405,7 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 // bool find_places_by_text( const cv::Mat& img, const cv::Mat& img_threshold, const cv::Rect& roi, int ocr_idx, places_t* param_places )
 bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 {
-	if( !is_founded( param.places, roi ) )
+	// if( !is_founded( param.places, roi ) )
 	{
 		auto img_roi = param.img(roi);
 		// auto img_roi = get_threshold_bin( img(roi), 20 );
@@ -388,6 +413,8 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 
 		if( identify_text( img_roi, ocr_idx ) )
 		{
+			if( param.algo_t == ALGO_CURRENT ) param.missed = 0;
+
 			cv::Rect roi2{ roi.x, roi.y, roi.width, roi.height };
 			if( roi2.x > 10 ) roi2.x -= 10;
 			if( roi2.y > 8 ) roi2.y -= 8;
@@ -414,6 +441,8 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 				places[g_frame_pos] = roi;
 		}*/
 	}
+	// else
+	// 	std::cout << "is_founded" << std::endl;
 	return false;
 }
 
@@ -434,8 +463,6 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	}
 	futures.clear();
 
-	// return true;
-
 	// std::vector<std::thread> th;
 
 	std::vector<cv::Rect> regions;
@@ -443,6 +470,7 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	for( auto& param: params )
 	{
 		// std::cout << "param.regions.size() = " << param.regions.size() << std::endl;
+		if( param.algo_t == ALGO_CURRENT && ++param.missed < 10 ) continue;
 
 		for( auto roi: param.regions )
 		{
@@ -467,34 +495,27 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	// 	std::cout << r << " ";
 	// std::cout << std::endl;
 
-	// for( auto t = th.begin(); t != th.end(); ++t )
-	// 	t->join();
+/*	for( auto t = th.begin(); t != th.end(); ++t )
+	{
+		pthread_t h = t->native_handle();
+		struct timespec ts;
+		if( clock_gettime(CLOCK_REALTIME, &ts) != -1)
+		{
+			ts.tv_nsec += 60 * 1000000;
+			int a = pthread_timedjoin_np( h, NULL, &ts );
+			std::cout << a << std::endl;
+			if( a == 0 )
+				std::cout << "timeout" << std::endl;
+		}
+		// else
+			// t->join();
+		// t->join();
+	}*/
 
-	int i = 0;
+	// int i = 0;
 
 	for( auto f = futures.begin(); f != futures.end(); ++f )
 	{
-		// ++i;
-		// double beg = (double)cv::getTickCount();
-		// // std::cout << "check" << std::endl;
-		// if( f->wait_for(std::chrono::milliseconds(0)) == std::future_status::timeout )
-		// {
-		// 	if( f->wait_for(std::chrono::milliseconds(40)) == std::future_status::timeout )
-		// 		std::cout << i << " timeout" << std::endl;
-		// }
-		// double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
-		// std::cout << i << " " << frame_tm << std::endl;
-
-
-		// std::future_status status = f->wait_for(std::chrono::milliseconds(60));
-  //       if (status == std::future_status::deferred)
-  //       {
-  //           std::cout << "deferred\n";
-  //       } else if (status == std::future_status::timeout) {
-  //           std::cout << "timeout\n";
-  //       } else if (status == std::future_status::ready) {
-  //           std::cout << "ready!\n";
-  //       }
 		f->get();
 	}
 	return true;
@@ -511,7 +532,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 	// g_tmp = frame_curr;
 	++frame_cnt;
 
-	// if( frame_cnt < 426 ) return;
+	// if( frame_cnt < 1000 ) return;
 
 	// std::cout << frame_cnt << std::endl;
 
@@ -539,9 +560,8 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					}
 				}
 				// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
-			// 	// cv::imshow( "detector", frame_curr );
-			// 	// if( cv::waitKey(1) == 27 )
-			// 	// 	;
+				cv::imshow( "detector", frame_curr );
+				cv::waitKey(1);
 			}
 		}
 		// img_prev_gray = img_curr_gray.clone();
@@ -552,7 +572,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		// if( frame_tm > 40 )
 			// std::cout << " \tframe_tm = " << frame_tm << std::endl;
 
-		if( frame_cnt % 50 != 0 );
+		if( frame_cnt % 200 != 0 );
 		else
 		{
 			std::cout << frame_cnt << "   " << tm_full << std::endl;

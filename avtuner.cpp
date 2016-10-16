@@ -223,18 +223,17 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 					AVStream* in_stream = ctx->in->streams[i];
 					if( i == ctx->v_idx )
 					{
-						AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
-						// AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
+						// AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+						AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
 						if( vcodec )
 						{
 							printf( "Video encoder: %s\n", vcodec->name );
 							ctx->v_stream = avformat_new_stream( ctx->out, vcodec );
 							if( avstream_copy_codec_ctx( in_stream, ctx->v_stream, (out_fmt->flags & AVFMT_GLOBALHEADER) ) == true )
 							{
-								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
-								// if( true )
-								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
-									av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
+								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
+								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
+								// 	av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
 								{
 									ctx->v_stream->codec->width = FRAME_WIDTH;
 									ctx->v_stream->codec->height = FRAME_HEIGHT;
@@ -256,16 +255,19 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 							}
 							else perror( "avstream_copy_codec_ctx()" );
 						}
-						else perror( "avcodec_find_encoder()" );
+						else perror( "avcodec_find_encoder(video)" );
 					}
 					else
 					{
 						AVCodec* acodec = avcodec_find_encoder(in_stream->codec->codec_id);
+						// AVCodec* acodec = avcodec_find_encoder_by_name("aac");
 						if( acodec )
 						{
+							printf( "Audio encoder: %s\n", acodec->name );
 							ctx->a_stream = avformat_new_stream( ctx->out, acodec );
 							if( avstream_copy_codec_ctx( in_stream, ctx->a_stream, (out_fmt->flags & AVFMT_GLOBALHEADER) ) == true )
 							{
+								// ctx->a_stream->codec->codec_id = acodec->id;
 								// ctx->a_stream->codec->time_base = ctx->a_stream->time_base = {1, 25};
 								if( avcodec_open2( ctx->a_stream->codec, acodec, NULL ) >= 0 )
 								{
@@ -274,7 +276,7 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 							}
 							else perror( "avstream_copy_codec_ctx()" );
 						}
-						else perror( "avcodec_find_encoder()" );
+						else perror( "avcodec_find_encoder(audio)" );
 					}
 				}
 			}

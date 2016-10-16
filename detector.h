@@ -45,6 +45,7 @@ class ImgParams
 public:
 	int threshold = 0;
 	int dilate = 0;
+	int missed = 10;
 	cv::Size dilate_kernel_size{3, 1};
 	cv::Size erode_kernel_size{3, 3};
 	cv::Mat dilate_kernel;
