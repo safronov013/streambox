@@ -223,17 +223,17 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 					AVStream* in_stream = ctx->in->streams[i];
 					if( i == ctx->v_idx )
 					{
-						// AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
-						AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
+						AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+						// AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
 						if( vcodec )
 						{
 							printf( "Video encoder: %s\n", vcodec->name );
 							ctx->v_stream = avformat_new_stream( ctx->out, vcodec );
 							if( avstream_copy_codec_ctx( in_stream, ctx->v_stream, (out_fmt->flags & AVFMT_GLOBALHEADER) ) == true )
 							{
-								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
-								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
-								// 	av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
+								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
+								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
+									av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
 								{
 									ctx->v_stream->codec->width = FRAME_WIDTH;
 									ctx->v_stream->codec->height = FRAME_HEIGHT;

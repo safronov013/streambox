@@ -52,23 +52,16 @@ void tesseract_init()
 
 pixel_t get_pixel_average( const cv::Mat& img )
 {
-	pixel_t px_average{0, 0, 0};
+	int px_average[] = {0, 0, 0};
+	int cnt = 0;
 
-	for( int i = 1; i < 8; ++i )
+	/*for( int i = 1; i < 8; ++i )
 	{
 		for( int j = 1; j < img.rows-1; ++j )
 		{
 			auto px = img.at<pixel_t>( cv::Point(i,j) );
-			if( px_average[0] == 0 && px_average[1] == 0 && px_average[2] == 0 )
-			{
-				px_average = px;
-			}
-			else
-			{
-				px_average[0] = (px_average[0] + px[0])/2;
-				px_average[1] = (px_average[1] + px[1])/2;
-				px_average[2] = (px_average[2] + px[2])/2;
-			}
+			px_average[0] += px[0]; px_average[1] += px[1]; px_average[2] += px[2];
+			++cnt;
 		}
 	}
 
@@ -77,45 +70,46 @@ pixel_t get_pixel_average( const cv::Mat& img )
 		for( int j = 1; j < img.rows-1; ++j )
 		{
 			auto px = img.at<pixel_t>( cv::Point(i,j) );
-			if( px_average[0] == 0 && px_average[1] == 0 && px_average[2] == 0 )
-			{
-				px_average = px;
-			}
-			else
-			{
-				px_average[0] = (px_average[0] + px[0])/2;
-				px_average[1] = (px_average[1] + px[1])/2;
-				px_average[2] = (px_average[2] + px[2])/2;
-			}
-			// std::cout << "px_average = " << px << px_average << std::endl;
+			px_average[0] += px[0]; px_average[1] += px[1]; px_average[2] += px[2];
+			++cnt;
 		}
 	}
-	return px_average;
+
+	if( cnt > 0 )
+	{
+		px_average[0] /= cnt; px_average[1] /= cnt; px_average[2] /= cnt;
+	}*/
+
+	cv::Scalar mean = cv::mean(img);
+
+	// pixel_t px_ret{(unsigned char)px_average[0], (unsigned char)px_average[1], (unsigned char)px_average[2]};
+	pixel_t px_ret{(unsigned char)mean[0], (unsigned char)mean[1], (unsigned char)mean[2]};
+	return px_ret;
 }
 
 void set_px_average( cv::Mat& img )
 {
 	std::vector<pixel_t> corners;
 
-	auto px_average = get_pixel_average(img);
-
+	// auto px_average = std::move(get_pixel_average(img));
+	auto mean = cv::mean(img);
+	pixel_t px_average{(unsigned char)mean[0], (unsigned char)mean[1], (unsigned char)mean[2]};
 	for( int i = 0; i < img.cols; ++i )
 	{
-		for( int j = 0, k = 0; j < img.rows; ++j, ++k )
+		for( int j = 0; j < img.rows; ++j )
 		{
-			if( k == 4 ) k = 0;
 			auto& px = img.at<pixel_t>( cv::Point(i,j) );
-			if( px[0] > 30 && px[1] > 30 && px[2] > 30 )
-			{
+			// if( px[0] > 10 && px[1] > 10 && px[2] > 10 )
+				// px = px_average;
 				px = px_average;
-			}
+
 		}
 	}
 }
 
 void hide_text( cv::Mat& img )
 {
-	int BLOCK_CNT = 8;
+	int BLOCK_CNT = 12;
 	int block_width = img.cols/BLOCK_CNT;
 
 	for( int i = 0; i < BLOCK_CNT; ++i )
@@ -123,15 +117,13 @@ void hide_text( cv::Mat& img )
 		int block_x = 0 + block_width*i;
 		if( i == BLOCK_CNT-1 ) block_width = img.cols - block_width*i;
 		cv::Rect block{ block_x, 0, block_width, img.rows };
-		// std::cout << "\tblock = " << block << std::endl;
 		cv::Mat tmp = img(block);
 		set_px_average( tmp );
 	}
-	// cv::imshow( "block", img(roi) );
-	// cv::waitKey(1000);
-
-	for( int i = 1; i < 10; i +=2 )
-		cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
+	// cv::GaussianBlur( img, img, cv::Size(13,13), 0, 0 );
+	cv::blur( img, img, cv::Size(17,17) );
+	// for( int i = 1; i < 10; i +=2 )
+	// 	cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
 }
 
 std::string foo( const cv::Mat& img, int idx )
@@ -178,7 +170,7 @@ bool identify_text( const cv::Mat& img, int idx )
 
 	if( str.size() > 10 ) str.resize(10);
 	// if( str.size() > 6 && str.size() < 12 && (str[0] == '0' || str[0] == 'O' || str[0] == '8' || str[0] == 'J' || str[0] == 'G' || str[0] == 'o' || str[1] == '0' ) )
-	if( str.size() > 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
+	if( str.size() > 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
 	{
 		for( auto c: str )
 		{
@@ -197,8 +189,8 @@ bool identify_text( const cv::Mat& img, int idx )
 	// if( str.size() == 0 )
 	{
 		// ret = true;
-		// std::cout << "\ttext = " << str << std::endl;
-		// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+		std::cout << "\ttext = " << str << std::endl;
+		std::cout << "\talpha_digit = " << alpha_digit << std::endl;
 	}
 	return ret;
 }
@@ -321,6 +313,7 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 	get_contours( img, contours );
 	// std::cout << "contours.size() = " << contours.size() << std::endl;
 	// draw_contours( contours, img.size() );
+	// cv::waitKey(500);
 
 	for( auto contour: contours )
 	{
@@ -330,8 +323,9 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 			auto box = rotated_box.boundingRect();
 
 			// if( box.width >= 171 && box.width <= 223 && box.height >= 17 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			// if( box.width >= 85 && box.width <= 86 && box.height >= 17 && box.height <= 46 )
 			// {
-			// 	// std::cout << "box = " << box << std::endl;
+			// 	std::cout << "\tbox = " << box << std::endl;
 			// }
 			if( box.width >= 171 && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
@@ -340,7 +334,7 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 				if( box.height > 40 ) 	box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					// std::cout << "box = " << box << std::endl;
+					std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -409,7 +403,7 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	{
 		auto img_roi = param.img(roi);
 		// auto img_roi = get_threshold_bin( img(roi), 20 );
-		auto img_roi_threshold = param.img_threshold(roi);
+		// auto img_roi_threshold = param.img_threshold(roi);
 
 		if( identify_text( img_roi, ocr_idx ) )
 		{
@@ -479,6 +473,9 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 																	} );
 			if( it == regions.end() && ocr_idx < OCR_MAX )
 			{
+				// cv::imshow( "t", param.img(roi) );
+
+
 				// futures.push_back( std::async( find_places_by_text, param.img, param.img_threshold, roi, ocr_idx, &param.places ) );
 				futures.push_back( std::async( find_places_by_text, std::ref(param), roi, ocr_idx ) );
 				// th.push_back( std::thread( find_places_by_text, std::ref(param), roi, ocr_idx ) );
@@ -532,7 +529,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 	// g_tmp = frame_curr;
 	++frame_cnt;
 
-	// if( frame_cnt < 1000 ) return;
+	// if( frame_cnt < 480 ) return;
 
 	// std::cout << frame_cnt << std::endl;
 
@@ -554,9 +551,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 				{
 					if( param.places.size() )
 					{
-						draw_rectangle( frame_curr, *param.places.rbegin() );
-						// cv::Mat tmp = frame_curr(*param.places.rbegin());
-						// hide_text( tmp );
+						// draw_rectangle( frame_curr, *param.places.rbegin() );
+						cv::Mat tmp = frame_curr(*param.places.rbegin());
+						hide_text( tmp );
 					}
 				}
 				// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
@@ -570,12 +567,12 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 		tm_full += frame_tm;
 		// if( frame_tm > 40 )
-			// std::cout << " \tframe_tm = " << frame_tm << std::endl;
+		// 	std::cout << " \tframe_tm = " << frame_tm << std::endl;
 
 		if( frame_cnt % 200 != 0 );
 		else
 		{
-			std::cout << frame_cnt << "   " << tm_full << std::endl;
+			std::cout << frame_cnt << "   " << tm_full/1000 << std::endl;
 		}
 	}
 	// cv::destroyAllWindows();
