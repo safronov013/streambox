@@ -183,14 +183,14 @@ bool identify_text( const cv::Mat& img, int idx )
 		{
 			// if( str.size() == 8 && alpha_digit/str.size() == 1 )
 			// 	searched_str = str;
-			std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
+			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
 	}
 	// if( str.size() == 0 )
 	{
 		// ret = true;
-		std::cout << "\ttext = " << str << std::endl;
-		std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+		// std::cout << "\ttext = " << str << std::endl;
+		// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
 	}
 	return ret;
 }
@@ -334,7 +334,7 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 				if( box.height > 40 ) 	box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					std::cout << "box = " << box << std::endl;
+					// std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -416,6 +416,7 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 			if( roi2.height < 33 && (param.img.rows - roi2.y - 33) >= 0 ) roi2.height = 33;
 			mutex_push.lock();
 			param.places.push_back(roi2);
+			std::cout << "Founded: " << param.places.size() << std::endl;
 			// places.push_back(roi2);
 			mutex_push.unlock();
 			return true;
@@ -523,28 +524,26 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 // void img_detect_label( cv::Mat& frame_curr )
 
 double tm_full = 0;
+double tm_full_prev = 0;
+int stat_size = 100;
 
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
-	// g_tmp = frame_curr;
 	++frame_cnt;
 
 	// if( frame_cnt < 480 ) return;
 
-	// std::cout << frame_cnt << std::endl;
-
-	auto beg = cv::getTickCount();
-	// cv::Mat frame_prev_gray, frame_curr_gray;
 	if( g )
 	{
+		auto beg = cv::getTickCount();
 		if( !frame_curr.empty() )
 		{
 			g->frame_curr.upload(frame_curr);
+			// beg = cv::getTickCount();
 			// cv::cvtColor( frame_curr, img_curr_gray, CV_BGR2GRAY );
 			cv::gpu::cvtColor( g->frame_curr, g->frame_curr_gray, CV_BGR2GRAY );
 			if( !g->frame_prev_gray.empty() )
 			{
-				// find_places_entry( g->gpu_frame_prev_gray, g->gpu_frame_curr_gray );
 				find_places_entry( params, g );
 
 				for( auto param: params )
@@ -557,22 +556,23 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					}
 				}
 				// draw_rectangle( frame_curr, cv::Rect( 10, 10, 50, 50 ) );
-				cv::imshow( "detector", frame_curr );
-				cv::waitKey(1);
+				// cv::imshow( "detector", frame_curr );
+				// cv::waitKey(1);
 			}
 		}
-		// img_prev_gray = img_curr_gray.clone();
 		g->frame_prev_gray = g->frame_curr_gray.clone();
 
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 		tm_full += frame_tm;
 		// if( frame_tm > 40 )
-		// 	std::cout << " \tframe_tm = " << frame_tm << std::endl;
+			// std::cout << "\tframe_cnt = " << frame_cnt << "\tframe_tm = " << frame_tm << std::endl;
 
-		if( frame_cnt % 200 != 0 );
+		if( frame_cnt % stat_size != 0 );
 		else
 		{
-			std::cout << frame_cnt << "   " << tm_full/1000 << std::endl;
+			// std::cout << frame_cnt << "   " << tm_full/1000 << std::endl;
+			std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
+			tm_full_prev = tm_full;
 		}
 	}
 	// cv::destroyAllWindows();

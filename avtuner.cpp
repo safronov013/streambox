@@ -231,15 +231,15 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 							ctx->v_stream = avformat_new_stream( ctx->out, vcodec );
 							if( avstream_copy_codec_ctx( in_stream, ctx->v_stream, (out_fmt->flags & AVFMT_GLOBALHEADER) ) == true )
 							{
-								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "llhq", 0 ) >= 0 )
-								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
-									av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
+								if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 )
+								// if( av_opt_set( ctx->v_stream->codec->priv_data, "preset", "slow", 0 ) >= 0 &&
+								// 	av_opt_set( ctx->v_stream->codec->priv_data, "tune", "zerolatency", 0 ) >= 0 )
 								{
 									ctx->v_stream->codec->width = FRAME_WIDTH;
 									ctx->v_stream->codec->height = FRAME_HEIGHT;
 									ctx->v_stream->codec->qmin = 10;
 									ctx->v_stream->codec->qmax = 51;
-									ctx->v_stream->codec->bit_rate = 5*1024*1024;
+									ctx->v_stream->codec->bit_rate = 4*1024*1024;
 									// ctx->v_stream->codec->codec_id = AV_CODEC_ID_H264;
 									ctx->v_stream->codec->codec_id = vcodec->id;
 									ctx->v_stream->codec->pix_fmt = AV_PIX_FMT_YUV420P;
