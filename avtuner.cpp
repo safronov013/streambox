@@ -223,8 +223,8 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 					AVStream* in_stream = ctx->in->streams[i];
 					if( i == ctx->v_idx )
 					{
-						// AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
-						AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
+						AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+						// AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
 						if( vcodec )
 						{
 							printf( "Video encoder: %s\n", vcodec->name );

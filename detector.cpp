@@ -5,6 +5,7 @@
 #include <iterator>
 #include <future>
 #include "detector.h"
+#include "queue_manager.h"
 
 
 int frame_cnt = 0;
@@ -22,7 +23,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 
 	regions.reserve(32);
 	contours.reserve(1028);
-	if( algo_t == ALGO_CURRENT ) reccurence = 4;
+	if( algo_t == ALGO_CURRENT ) reccurence = 1;
 }
 
 std::mutex mutex_push;
@@ -341,7 +342,8 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 
 bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 {
-	std::vector<std::future<bool>> futures;
+	// std::vector<std::future<bool>> futures;
+	std::vector<std::thread> pool;
 
 	for( auto& param: params )
 	{
@@ -352,21 +354,25 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 			if( ++param.missed < 10 ) continue;
 			if( param.reccurence > 1 && frame_cnt % param.reccurence != 0 ) continue;
 		}
-		futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
+		// futures.push_back( std::async( std::launch::async, find_places_by_size, std::ref(param), g ) );
+		// futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
+		pool.push_back( std::thread(find_places_by_size, std::ref(param), g) );
 	}
 
-	for( auto f = futures.begin(); f != futures.end(); ++f )
-	{
-		f->get();
-	}
-	futures.clear();
+	// for( auto t = pool.begin(); t != pool.end(); ++t )
+	// 	t->join();
+	for( auto& t: pool )
+		t.join();
+	// pool.clear();
+
 
 	// std::vector<std::thread> th;
 
-	std::vector<cv::Rect> regions;
+/*	std::vector<cv::Rect> regions;
 	int ocr_idx = 0;
 	for( auto& param: params )
 	{
+		if( param.algo_t == ALGO_CURRENT ) continue;
 		for( auto roi: param.regions )
 		{
 			auto it = std::find_if( regions.begin(), regions.end(), [=] (cv::Rect r) {
@@ -382,9 +388,9 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 			}
 		}
 	}
-
-	for( auto f = futures.begin(); f != futures.end(); ++f )
-		f->get();
+*/
+	// for( auto f = futures.begin(); f != futures.end(); ++f )
+	// 	f->get();
 	return true;
 }
 
@@ -433,7 +439,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		else
 		{
 			// std::cout << frame_cnt << "   " << tm_full/1000 << std::endl;
-			std::cout << std::endl;
+			// std::cout << std::endl;
 			std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
 			tm_full_prev = tm_full;
 		}

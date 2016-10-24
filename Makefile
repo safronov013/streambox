@@ -3,7 +3,8 @@
 
 TARGET=streambox
 LIB_SRC=avtuner.cpp\
-	detector.cpp
+	detector.cpp\
+	queue_manager.cpp
 
 OBJECTS=$(LIB_SRC:.cpp=.o) $(TARGET).o
 LIBS=$(LIB_SRC:.cpp=.a)
