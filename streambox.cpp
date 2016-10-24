@@ -74,57 +74,51 @@ void avframe_update( AVFrame* frame, GPUVARS* g, std::vector<ImgParams>& params 
 		// img_draw_rect(cvframe);
 		// cv::imshow( "img", cvframe );
 		// cv::waitKey(1);
+		// std::cout << 8;
 		img_detect_label( cvframe, params, g );
+		// std::cout << 9;
 		cvmat_2_avframe(&cvframe);
 	}
 }
 
-int main( int argc, char* argv[] )
+void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 {
-	int ret = 0;
-
-	if( argc != 3 ) return 0;
-
-	if( cvt_init() != true ) return 0;
-	char* source = argv[1];
-	char* destination = argv[2];
-
-	tesseract_init();
-	avstream_init();
-
 	GPUVARS g;
+	g.frame_curr.upload(cvframe);
 	std::vector<ImgParams> params = {
-		// { 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
-		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
+		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
 	};
-	AVSTREAMCTX ctx;
-	memset( &ctx, 0, sizeof(ctx) );
+	
 
-	// while(1)
+	if( ctx != NULL && source != NULL && destination != NULL )
 	{
-		if( avstream_open_input( source, &ctx ) )
+		if( avstream_open_input( source, ctx ) )
 		{
-			if( avstream_open_output( destination, &ctx ) )
+			if( avstream_open_output( destination, ctx ) )
 			{
 				AVPacket pkt, out_pkt;
 				while(true)
 				{
 					av_init_packet(&pkt);
-					if( avstream_read_packet( &ctx, &pkt ) )
+					// std::cout << 0;
+					if( avstream_read_packet( ctx, &pkt ) )
 					{
+						// std::cout << 1;
 						AVPacket out_pkt;
 						av_init_packet(&out_pkt); out_pkt.data = NULL; out_pkt.size = 0;
-						if( pkt.stream_index == ctx.v_idx )
+						if( pkt.stream_index == ctx->v_idx )
 						{
-							avframe_update( ctx.frame, &g, params );
-							if( avstream_encode_video_packet( &ctx, &out_pkt, avframe_dst ) )
+							avframe_update( ctx->frame, &g, params );
+							if( avstream_encode_video_packet( ctx, &out_pkt, avframe_dst ) )
 							{
 								// if( avstream_write_packet2( &ctx, &out_pkt ) )
-								if( avstream_write_packet( &ctx, &out_pkt ) )
+								// std::cout << 2;
+								if( avstream_write_packet( ctx, &out_pkt ) )
 								{
 								}
 								else perror( "avstream_write_packet2()" );
@@ -133,9 +127,9 @@ int main( int argc, char* argv[] )
 						}
 						else
 						{
-							if( avstream_encode_audio_packet( &ctx, &out_pkt, ctx.frame ) )
+							if( avstream_encode_audio_packet( ctx, &out_pkt, ctx->frame ) )
 							{
-								if( avstream_write_packet2( &ctx, &out_pkt ) )
+								if( avstream_write_packet2( ctx, &out_pkt ) )
 								{
 								}
 								else perror( "avstream_write_packet2()" );
@@ -148,13 +142,13 @@ int main( int argc, char* argv[] )
 					{
 						perror( "avstream_read_packet()" );
 						// break;
-						avstream_reopen_input( source, &ctx );
+						avstream_reopen_input( source, ctx );
 					}
 					av_packet_unref(&pkt); pkt.data = NULL; pkt.size = 0;
 				}
 			}
 			else perror( "avstream_open_output" );
-			avstream_close_output(&ctx);
+			avstream_close_output(ctx);
 		}
 		else
 		{
@@ -162,6 +156,42 @@ int main( int argc, char* argv[] )
 			// break;
 		}
 		// avstream_close( &ctx );
-		avstream_close_input( &ctx );
+		avstream_close_input( ctx );
+	}
+}
+
+int main( int argc, char* argv[] )
+{
+	int ret = 0;
+
+	if( argc != 3 ) return 0;
+
+	if( cvt_init() != true ) return 0;
+	char* source = argv[1];
+	char* destination = argv[2];
+	AVSTREAMCTX ctx;
+
+	memset( &ctx, 0, sizeof(ctx) );
+	tesseract_init();
+	avstream_init();
+
+	while(1)
+	{
+		try
+		{
+			avstream_main( &ctx, source, destination );
+		}
+		catch(const std::exception& e)
+		{
+			std::cout << "stl exception: " << e.what() << std::endl;
+		}
+		catch(...)
+		{
+			std::cout << "unknown exception" << std::endl;
+		}
+		std::cout << "end avstream_main()" << std::endl;
+		avstream_close_input(&ctx);
+		avstream_close_output(&ctx);
+		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 }

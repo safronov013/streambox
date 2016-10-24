@@ -35,9 +35,9 @@ enum algorithm_t
 typedef struct _GPUVARS_S
 {
 	cv::gpu::GpuMat frame_curr;
-	cv::gpu::GpuMat frame_prev;
 	cv::gpu::GpuMat frame_curr_gray;
 	cv::gpu::GpuMat frame_prev_gray;
+	cv::Mat img_curr_gray;
 } GPUVARS;
 
 class ImgParams
@@ -46,6 +46,7 @@ public:
 	int threshold = 0;
 	int dilate = 0;
 	int missed = 10;
+	int reccurence = 1;
 	cv::Size dilate_kernel_size{3, 1};
 	cv::Size erode_kernel_size{3, 3};
 	cv::Mat dilate_kernel;
@@ -66,6 +67,7 @@ public:
 	std::vector<cv::Rect> regions;
 	std::vector<std::vector<cv::Point>> contours;
 	places_t places;
+	cv::Rect roi_place;
 	ImgParams();
 	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a );
 	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param );

@@ -91,7 +91,7 @@ bool avstream_encode_video_packet( AVSTREAMCTX* ctx, AVPacket* pkt, AVFrame* fra
 				// printf( "Success: got_packet\n" );
 				ret = true;
 			}
-			else perror("got_packet");
+			// else perror("got_packet");
 		}
 		else perror("avcodec_encode_video2()");
 		// else printf( "avcodec_encode_video2() = %08X\n", err );
@@ -223,8 +223,8 @@ bool avstream_open_output( char* dest, PAVSTREAMCTX ctx )
 					AVStream* in_stream = ctx->in->streams[i];
 					if( i == ctx->v_idx )
 					{
-						AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
-						// AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
+						// AVCodec* vcodec = avcodec_find_encoder(AV_CODEC_ID_H264);
+						AVCodec* vcodec = avcodec_find_encoder_by_name("h264_nvenc");
 						if( vcodec )
 						{
 							printf( "Video encoder: %s\n", vcodec->name );
