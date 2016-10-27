@@ -13,6 +13,8 @@
 // #include <opencv2/video/tracking.hpp>
 #include <opencv2/gpu/gpu.hpp>
 #include <tesseract/baseapi.h>
+#include "queue_manager.h"
+
 
 #pragma comment( lib, "opencv_core2413.lib" )
 #pragma comment( lib, "opencv_highgui2413.lib" )
@@ -75,7 +77,9 @@ public:
 
 void tesseract_init();
 // void img_detect_label( cv::Mat& frame_curr, GPUVARS& g );
+// void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g, QueueManager& worker );
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g );
 void img_draw_rect( cv::Mat& frame_curr );
+bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item );
 
 #endif

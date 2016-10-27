@@ -1,6 +1,7 @@
 #include <iostream>
 #include "avtuner.h"
 #include "detector.h"
+#include "queue_manager.h"
 
 
 AVPixelFormat pixfmt_bgr = AV_PIX_FMT_BGR24;
@@ -10,6 +11,7 @@ SwsContext* cvt_yuv2bgr = NULL;
 AVFrame* avframe_src = NULL;
 AVFrame* avframe_dst = NULL;
 cv::Mat cvframe( FRAME_HEIGHT, FRAME_WIDTH, CV_8UC3 );
+QueueManager worker;
 
 bool cvt_init()
 {
@@ -81,6 +83,11 @@ void avframe_update( AVFrame* frame, GPUVARS* g, std::vector<ImgParams>& params 
 	}
 }
 
+void infinity_loop()
+{
+	worker.listen();
+}
+
 void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 {
 	GPUVARS g;
@@ -93,7 +100,9 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
 	};
-	
+
+	std::thread t1( infinity_loop );
+	t1.detach();
 
 	if( ctx != NULL && source != NULL && destination != NULL )
 	{
@@ -160,6 +169,18 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 	}
 }
 
+// void bar( QueueManager& q )
+// {
+// 	for( int i = 0; i < 10; ++i )
+// 	{
+// 		cv::Rect r(i, 0, i*10, 50);
+
+// 		q.add( r );
+// 		std::this_thread::sleep_for( std::chrono::seconds(2) );
+// 	}
+// }
+
+
 int main( int argc, char* argv[] )
 {
 	int ret = 0;
@@ -192,6 +213,6 @@ int main( int argc, char* argv[] )
 		std::cout << "end avstream_main()" << std::endl;
 		avstream_close_input(&ctx);
 		avstream_close_output(&ctx);
-		std::this_thread::sleep_for(std::chrono::seconds(3));
+		std::this_thread::sleep_for(std::chrono::seconds(2));
 	}
 }
