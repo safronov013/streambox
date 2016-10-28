@@ -22,7 +22,7 @@
 #pragma comment( lib, "opencv_video2413.lib" )
 #pragma comment( lib, "tesseract/libtesseract302.lib" )
 
-#define OCR_MAX 16
+#define OCR_MAX 8
 
 typedef cv::Vec3b pixel_t;
 typedef std::vector<cv::Rect> places_t;
@@ -81,5 +81,6 @@ void tesseract_init();
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g );
 void img_draw_rect( cv::Mat& frame_curr );
 bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item );
+void roi_normalize( cv::Rect& roi, int width, int height );
 
 #endif

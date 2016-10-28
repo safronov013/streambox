@@ -11,8 +11,21 @@
 #include <tesseract/baseapi.h>
 
 
-// typedef cv::Rect RoiData;
+
 typedef std::tuple<cv::Rect,cv::Mat> RoiData;
+typedef std::pair<cv::Rect,cv::Rect> RoiResult;
+
+typedef struct _ROI_RESULT_S
+{
+	cv::Rect roi_real;
+	cv::Rect roi_norm;
+	int left;
+} ROI_RESULT;
+
+// extern std::deque<RoiResult> g_results;
+extern std::deque<ROI_RESULT> g_results;
+extern std::mutex g_mutex;
+
 
 
 class Thread
@@ -34,10 +47,9 @@ typedef std::unique_ptr<Thread> ThreadPtr;
 
 class QueueManager
 {
-	const int m_thread_max = 4;
+	const int m_thread_max = 6;
 	std::vector<ThreadPtr> m_threads;
 	std::deque<RoiData> m_pool;
-	std::deque<RoiData> m_results;
 	std::mutex m_mutex;
 	std::condition_variable m_cv;
 public:

@@ -6,20 +6,30 @@
 #include "detector.h"
 
 
-
 Thread::Thread()
 {
-	std::cout << "Thread tesseract_init()..." << std::endl;
+	// std::cout << "Thread tesseract_init()..." << std::endl;
 	tesseract_init();
 }
 
 void Thread::foo()
 {
-	// std::cout << "start: " << std::get<0>(m_roi) << std::endl;
-	// std::this_thread::sleep_for( std::chrono::seconds(1) );
 	if( identify_text( std::get<1>(m_roi), m_ocr ) )
 	{
-		std::cout << "Succeeded: " << std::get<0>(m_roi) << std::endl;
+		std::lock_guard<std::mutex> lg(g_mutex);
+		auto it = std::find_if( g_results.begin(), g_results.end(), [=] (const ROI_RESULT& r) {
+																		auto cross = r.roi_real & std::get<0>(m_roi);
+																		return ((double)cross.area()/r.roi_real.area() >= 0.8);
+																	} );
+
+		if( it == g_results.end() )
+		{
+			cv::Rect roi_fixed = std::get<0>(m_roi);
+			// std::cout << "Succeeded: " << roi_fixed << std::endl;
+			roi_normalize( roi_fixed, 1920, 1080 );
+			g_results.push_back({std::get<0>(m_roi), roi_fixed, 250});
+		}
+		while( g_results.size() > 2 ) g_results.pop_front();
 	}
 	m_status = false;
 }
@@ -66,7 +76,6 @@ void QueueManager::process()
 	auto it = std::find_if( m_threads.begin(), m_threads.end(), [](const ThreadPtr& ptr) { return !ptr->m_status; } );
 	if( it != m_threads.end() )
 	{
-		// std::cout << "Free thread founded!" << std::endl;
 		auto roi = std::move(m_pool.front());
 		m_pool.pop_front();
 		(*it)->start(roi);
@@ -83,7 +92,6 @@ void QueueManager::add( RoiData&& roi )
 	}
 	m_cv.notify_one();
 }
-
 
 QueueManager::~QueueManager()
 {
