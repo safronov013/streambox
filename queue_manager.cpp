@@ -80,8 +80,8 @@ void QueueManager::process()
 		m_pool.pop_front();
 		(*it)->start(roi);
 	}
-	else
-		std::cout << "No Free thread" << std::endl;
+	// else
+	// 	std::cout << "No Free thread" << std::endl;
 }
 
 void QueueManager::add( RoiData&& roi )

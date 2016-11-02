@@ -99,6 +99,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
+		// { 20,  5,  cv::Size(6,2), cv::Size(1,1), ALGO_DIFF },
 	};
 
 	std::thread t1( infinity_loop );
@@ -130,7 +131,11 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 								if( avstream_write_packet( ctx, &out_pkt ) )
 								{
 								}
-								else perror( "avstream_write_packet2()" );
+								else
+								{
+									perror( "avstream_write_packet2()" );
+									break;
+								}
 							}
 							else perror( "avstream_encode_video_packet()" );
 						}
@@ -141,7 +146,11 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 								if( avstream_write_packet2( ctx, &out_pkt ) )
 								{
 								}
-								else perror( "avstream_write_packet2()" );
+								else
+								{
+									perror( "avstream_write_packet2()" );
+									break;
+								}
 							}
 							else perror( "avstream_encode_audio_packet()" );
 						}

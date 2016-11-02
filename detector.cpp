@@ -102,7 +102,7 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 {
 	bool ret = false;
 
-	double beg = (double)cv::getTickCount();
+	// double beg = (double)cv::getTickCount();
 
 	ocr_item.SetImage( img.data, img.cols, img.rows, 1, img.step );
 	std::string str = ocr_item.GetUTF8Text();
@@ -111,7 +111,7 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	// double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 	// std::cout << "identify_tm = " << frame_tm << std::endl;
 
-	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n'); } );
+	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' '); } );
 	if( new_end != str.end() )
 		str.erase( new_end, str.end() );
 
@@ -130,9 +130,15 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 			// 	searched_str = str;
 			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
+		// else
+		// 	std::cout << alpha_digit/str.size() << std::endl;
 	}
 	// std::cout << "\ttext = " << str << std::endl;
 	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+
+	// for( auto c: str )
+	// 	std::cout << c << "-" << (int)c << std::endl;
+
 	return ret;
 }
 
@@ -220,16 +226,27 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 	get_contours( img, contours );
 	// std::cout << "contours.size() = " << contours.size() << std::endl;
 	// draw_contours( contours, img.size() );
-	// cv::waitKey(500);
+	// cv::waitKey(2000);
 
 	for( auto contour: contours )
 	{
 		auto rotated_box = cv::minAreaRect(contour);
-		if( rotated_box.angle < 15 || rotated_box.angle > 345 )
+		// if( rotated_box.angle < 15 || rotated_box.angle > 345 )
 		{
 			auto box = rotated_box.boundingRect();
 
-			if( box.width >= 171 && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			// if( box.width >= 70 && box.width <= 400 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
+			// if( box.width >= 95 && box.width <= 250 )
+			// {
+			// 	std::cout << "box0 = " << box << std::endl;
+			// 	// cv::imshow( "label", img(box) );
+			// 	// cv::waitKey(500);
+
+			// }
+
+
+			// if( box.width >= 171 && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			if( (box.width >= 171 || (box.x > 1700 && box.width >= 150)) && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
 				if( box.height <= 19 ) { box.y -= 2; box.height += 4; }
 				if( box.height > 40 ) 	box.height = 30;
@@ -288,8 +305,8 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 	get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
 
-	// cv::imshow( "img", param.img_dilated );
-	// cv::waitKey(1);
+	// cv::imshow( "img", param.img );
+	// cv::waitKey(1000);
 	find_text_regions( param.img_dilated, param.regions, param.contours );
 
 	return true;
@@ -397,7 +414,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 {
 	++frame_cnt;
 
-	// if( frame_cnt < 480 ) return;
+	// if( frame_cnt < 170 ) return;
 	if( g )
 	{
 		auto beg = cv::getTickCount();
@@ -428,7 +445,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					}
 				}
 				// cv::imshow( "detector", frame_curr );
-				// cv::waitKey(1);
+				// cv::waitKey(500);
 			}
 		}
 		g->frame_prev_gray = g->frame_curr_gray.clone();
