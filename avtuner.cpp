@@ -20,7 +20,6 @@ bool decode_audio_packet( AVSTREAMCTX* ctx, AVPacket* pkt )
 		int got_frame = 0;
 		if( avcodec_decode_audio4( ctx->a_dec, ctx->frame, &got_frame, pkt ) >= 0 )
 		{
-			// log_packet( pkt );
 			if( got_frame )
 			{
 				ret = true;
@@ -60,11 +59,8 @@ bool avstream_encode_audio_packet( AVSTREAMCTX* ctx, AVPacket* pkt, AVFrame* fra
 		if( avcodec_encode_audio2( ctx->a_stream->codec, pkt, frame, &got_packet ) >= 0 )
 		{
 			pkt->stream_index = ctx->a_idx;
-			// log_packet( pkt );
 			if( got_packet )
-			{
 				ret = true;
-			}
 		}
 		else perror("avcodec_encode_audio2()");
 	}
@@ -79,7 +75,6 @@ bool avstream_encode_video_packet( AVSTREAMCTX* ctx, AVPacket* pkt, AVFrame* fra
 	{
 		int got_packet = 0;
 		frame->pts = ctx->v_counter++;
-		// wprintf( L"frame->pts = %d\n", frame->pts );
 		pkt->data = NULL;
 		pkt->size = 0;
 		int err = avcodec_encode_video2( ctx->v_stream->codec, pkt, frame, &got_packet );
@@ -87,14 +82,10 @@ bool avstream_encode_video_packet( AVSTREAMCTX* ctx, AVPacket* pkt, AVFrame* fra
 		{
 			pkt->stream_index = ctx->v_idx;
 			if( got_packet )
-			{
-				// printf( "Success: got_packet\n" );
 				ret = true;
-			}
 			// else perror("got_packet");
 		}
 		else perror("avcodec_encode_video2()");
-		// else printf( "avcodec_encode_video2() = %08X\n", err );
 	}
 	return ret;
 }
@@ -377,19 +368,11 @@ bool avstream_write_packet( AVSTREAMCTX* ctx, AVPacket* pkt )
 		AVStream* in_stream = ctx->in->streams[pkt->stream_index];
 		AVStream* out_stream = ctx->out->streams[pkt->stream_index];
 
-		// av_packet_rescale_ts( pkt, out_stream->codec->time_base, out_stream->time_base );
-
-		// out_stream->time_base = {1, 25};
-/*		pkt->pts = av_rescale_q_rnd( pkt->pts, out_stream->codec->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX) );
-		pkt->dts = av_rescale_q_rnd( pkt->dts, out_stream->codec->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX) );
-		pkt->duration = av_rescale_q( pkt->duration, out_stream->codec->time_base, out_stream->time_base );
-*/
 		pkt->pts = av_rescale_q_rnd( pkt->pts, out_stream->codec->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX) );
 		pkt->dts = av_rescale_q_rnd( pkt->dts, out_stream->codec->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX) );
 		pkt->duration = av_rescale_q( pkt->duration, out_stream->codec->time_base, out_stream->time_base );
-		// pkt->pos = -1;
-
 		// log_packet( pkt );
+
 		if( av_interleaved_write_frame( ctx->out, pkt ) >= 0 )
 		{
 			ret = true;

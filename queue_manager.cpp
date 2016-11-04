@@ -8,11 +8,24 @@
 
 Thread::Thread()
 {
-	// std::cout << "Thread tesseract_init()..." << std::endl;
 	tesseract_init();
 }
 
-void Thread::foo()
+void Thread::tesseract_init()
+{
+	m_ocr.Init( NULL, "eng", tesseract::OEM_TESSERACT_ONLY );
+	m_ocr.SetPageSegMode( tesseract::PSM_SINGLE_WORD );
+}
+
+void Thread::start( RoiData& roi )
+{
+	if( m_handle.joinable() ) m_handle.join();
+	m_status = true;
+	m_roi = std::move(roi);
+	m_handle = std::thread( &Thread::process_roi, this );
+}
+
+void Thread::process_roi()
 {
 	if( identify_text( std::get<1>(m_roi), m_ocr ) )
 	{
@@ -25,7 +38,6 @@ void Thread::foo()
 		if( it == g_results.end() )
 		{
 			cv::Rect roi_fixed = std::get<0>(m_roi);
-			// std::cout << "Succeeded: " << roi_fixed << std::endl;
 			roi_normalize( roi_fixed, 1920, 1080 );
 			g_results.push_back({std::get<0>(m_roi), roi_fixed, 250});
 		}
@@ -34,19 +46,6 @@ void Thread::foo()
 	m_status = false;
 }
 
-void Thread::start( RoiData& roi )
-{
-	if( m_handle.joinable() ) m_handle.join();
-	m_status = true;
-	m_roi = std::move(roi);
-	m_handle = std::thread( &Thread::foo, this );
-}
-
-void Thread::tesseract_init()
-{
-	m_ocr.Init( NULL, "eng", tesseract::OEM_TESSERACT_ONLY );
-	m_ocr.SetPageSegMode( tesseract::PSM_SINGLE_WORD );
-}
 
 Thread::~Thread()
 {
@@ -80,8 +79,6 @@ void QueueManager::process()
 		m_pool.pop_front();
 		(*it)->start(roi);
 	}
-	// else
-	// 	std::cout << "No Free thread" << std::endl;
 }
 
 void QueueManager::add( RoiData&& roi )

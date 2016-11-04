@@ -13,6 +13,7 @@ AVFrame* avframe_dst = NULL;
 cv::Mat cvframe( FRAME_HEIGHT, FRAME_WIDTH, CV_8UC3 );
 QueueManager worker;
 
+
 bool cvt_init()
 {
 	bool ret = false;
@@ -71,14 +72,7 @@ void avframe_update( AVFrame* frame, GPUVARS* g, std::vector<ImgParams>& params 
 	if( frame && g )
 	{
 		avframe_2_cvmat( frame );
-		// auto frame_curr = cvframe.clone();
-		
-		// img_draw_rect(cvframe);
-		// cv::imshow( "img", cvframe );
-		// cv::waitKey(1);
-		// std::cout << 8;
 		img_detect_label( cvframe, params, g );
-		// std::cout << 9;
 		cvmat_2_avframe(&cvframe);
 	}
 }
@@ -99,7 +93,6 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
-		// { 20,  5,  cv::Size(6,2), cv::Size(1,1), ALGO_DIFF },
 	};
 
 	std::thread t1( infinity_loop );
@@ -115,10 +108,8 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 				while(true)
 				{
 					av_init_packet(&pkt);
-					// std::cout << 0;
 					if( avstream_read_packet( ctx, &pkt ) )
 					{
-						// std::cout << 1;
 						AVPacket out_pkt;
 						av_init_packet(&out_pkt); out_pkt.data = NULL; out_pkt.size = 0;
 						if( pkt.stream_index == ctx->v_idx )
@@ -126,14 +117,9 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 							avframe_update( ctx->frame, &g, params );
 							if( avstream_encode_video_packet( ctx, &out_pkt, avframe_dst ) )
 							{
-								// if( avstream_write_packet2( &ctx, &out_pkt ) )
-								// std::cout << 2;
-								if( avstream_write_packet( ctx, &out_pkt ) )
+								if( !avstream_write_packet( ctx, &out_pkt ) )
 								{
-								}
-								else
-								{
-									perror( "avstream_write_packet2()" );
+									av_packet_unref(&out_pkt);
 									break;
 								}
 							}
@@ -143,12 +129,9 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 						{
 							if( avstream_encode_audio_packet( ctx, &out_pkt, ctx->frame ) )
 							{
-								if( avstream_write_packet2( ctx, &out_pkt ) )
+								if( !avstream_write_packet2( ctx, &out_pkt ) )
 								{
-								}
-								else
-								{
-									perror( "avstream_write_packet2()" );
+									av_packet_unref(&out_pkt);
 									break;
 								}
 							}
@@ -159,7 +142,6 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 					else
 					{
 						perror( "avstream_read_packet()" );
-						// break;
 						avstream_reopen_input( source, ctx );
 					}
 					av_packet_unref(&pkt); pkt.data = NULL; pkt.size = 0;
@@ -171,24 +153,10 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 		else
 		{
 			perror( "avstream_open_input()" );
-			// break;
 		}
-		// avstream_close( &ctx );
 		avstream_close_input( ctx );
 	}
 }
-
-// void bar( QueueManager& q )
-// {
-// 	for( int i = 0; i < 10; ++i )
-// 	{
-// 		cv::Rect r(i, 0, i*10, 50);
-
-// 		q.add( r );
-// 		std::this_thread::sleep_for( std::chrono::seconds(2) );
-// 	}
-// }
-
 
 int main( int argc, char* argv[] )
 {
@@ -205,23 +173,8 @@ int main( int argc, char* argv[] )
 	tesseract_init();
 	avstream_init();
 
-	while(1)
-	{
-		try
-		{
-			avstream_main( &ctx, source, destination );
-		}
-		catch(const std::exception& e)
-		{
-			std::cout << "stl exception: " << e.what() << std::endl;
-		}
-		catch(...)
-		{
-			std::cout << "unknown exception" << std::endl;
-		}
-		std::cout << "end avstream_main()" << std::endl;
-		avstream_close_input(&ctx);
-		avstream_close_output(&ctx);
-		std::this_thread::sleep_for(std::chrono::seconds(2));
-	}
+	avstream_main( &ctx, source, destination );
+
+	avstream_close_input(&ctx);
+	avstream_close_output(&ctx);
 }

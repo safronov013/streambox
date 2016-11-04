@@ -11,7 +11,6 @@
 #include <tesseract/baseapi.h>
 
 
-
 typedef std::tuple<cv::Rect,cv::Mat> RoiData;
 typedef std::pair<cv::Rect,cv::Rect> RoiResult;
 
@@ -22,10 +21,8 @@ typedef struct _ROI_RESULT_S
 	int left;
 } ROI_RESULT;
 
-// extern std::deque<RoiResult> g_results;
 extern std::deque<ROI_RESULT> g_results;
 extern std::mutex g_mutex;
-
 
 
 class Thread
@@ -37,13 +34,13 @@ public:
 	bool m_status;
 	Thread();
 	~Thread();
-	void start( RoiData& roi );
 	void tesseract_init();
-	void foo();
+	void start( RoiData& roi );
+	void process_roi();
 };
 
 typedef std::unique_ptr<Thread> ThreadPtr;
-// typedef std::thread ThreadPtr;
+
 
 class QueueManager
 {

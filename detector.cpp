@@ -25,7 +25,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 
 	regions.reserve(32);
 	contours.reserve(1028);
-	if( algo_t == ALGO_CURRENT ) reccurence = 1;
+	if( algo_t == ALGO_CURRENT ) reccurence = 2;
 }
 
 std::mutex mutex_push;
@@ -82,38 +82,16 @@ void hide_text( cv::Mat& img )
 	}
 }
 
-std::string foo( const cv::Mat& img, int idx )
-{
-	ocr[idx].SetImage( img.data, img.cols, img.rows, 1, img.step );
-	return ocr[idx].GetUTF8Text();
-}
-
-void bar( const cv::Mat& img, int idx, std::string& str )
-{
-	ocr[idx].SetImage( img.data, img.cols, img.rows, 1, img.step );
-	str = ocr[idx].GetUTF8Text();
-}
-
-
-// auto d = std::chrono::milliseconds(45);
-
-// bool identify_text( const cv::Mat& img, int idx )
 bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 {
 	bool ret = false;
-
-	// double beg = (double)cv::getTickCount();
+	double alpha_digit = 0;
 
 	ocr_item.SetImage( img.data, img.cols, img.rows, 1, img.step );
 	std::string str = ocr_item.GetUTF8Text();
-	double alpha_digit = 0;
-
-	// double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
-	// std::cout << "identify_tm = " << frame_tm << std::endl;
 
 	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' '); } );
-	if( new_end != str.end() )
-		str.erase( new_end, str.end() );
+	if( new_end != str.end() ) str.erase( new_end, str.end() );
 
 	if( str.size() > 10 ) str.resize(10);
 	if( str.size() > 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
@@ -135,9 +113,6 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	}
 	// std::cout << "\ttext = " << str << std::endl;
 	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
-
-	// for( auto c: str )
-	// 	std::cout << c << "-" << (int)c << std::endl;
 
 	return ret;
 }
@@ -292,7 +267,6 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 	}
 	else
 	{
-		// param.gpu_img = g->frame_curr_gray.clone();
 		cv::gpu::threshold( g->frame_curr_gray, param.gpu_img, 170, 255, CV_THRESH_TOZERO );
 	}
 	param.gpu_img.download(param.img);
@@ -314,10 +288,13 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 
 void roi_normalize( cv::Rect& roi, int width, int height )
 {
+	int limit_width = 210;
+	int limit_height = 33;
+
 	if( roi.x > 10 ) roi.x -= 10;
 	if( roi.y > 8 ) roi.y -= 8;
-	if( roi.width < 210 && (width - roi.x - 210) >= 0 ) roi.width = 210;
-	if( roi.height < 33 && (height - roi.y - 33) >= 0 ) roi.height = 33;
+	if( roi.width < limit_width && (width - roi.x - limit_width) >= 0 ) roi.width = limit_width;
+	if( roi.height < limit_height && (height - roi.y - limit_height) >= 0 ) roi.height = limit_height;
 }
 
 bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
@@ -326,7 +303,6 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 
 	if( identify_text( img_roi, ocr[ocr_idx] ) )
 	{
-		// if( param.algo_t == ALGO_CURRENT ) param.missed = 0;
 		mutex_push.lock();
 		param.roi_place = roi;
 		roi_normalize( param.roi_place, param.img.cols, param.img.rows );
@@ -336,10 +312,15 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	return false;
 }
 
+std::vector<std::future<bool>> g_futures;
+std::vector<std::thread> g_pool;
+std::vector<cv::Rect> g_regions;
+
 bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 {
-	std::vector<std::future<bool>> futures;
-	// std::vector<std::thread> pool;
+	g_futures.clear();
+	g_pool.clear();
+	g_regions.clear();
 
 	for( auto& param: params )
 	{
@@ -347,62 +328,37 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 		param.contours.erase( param.contours.begin(), param.contours.end() );
 		if( param.algo_t == ALGO_CURRENT )
 		{
-			// if( ++param.missed < 10 ) continue;
 			if( param.reccurence > 1 && frame_cnt % param.reccurence != 0 ) continue;
 		}
-		// futures.push_back( std::async( std::launch::async, find_places_by_size, std::ref(param), g ) );
-		futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
-		// pool.push_back( std::thread(find_places_by_size, std::ref(param), g) );
+		g_futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
 	}
+	for( auto& f: g_futures ) f.get();
 
-	// for( auto t = pool.begin(); t != pool.end(); ++t )
-	// 	t->join();
-	// for( auto& t: pool )
-	// 	t.join();
-
-	for( auto& f: futures )
-		f.get();
-
-	// pool.clear();
-	futures.clear();
-
-
-	std::vector<std::thread> pool;
-	std::vector<cv::Rect> regions;
 	int ocr_idx = 0;
 	for( auto& param: params )
 	{
 		for( auto roi: param.regions )
 		{
-			auto it = std::find_if( regions.begin(), regions.end(), [=] (cv::Rect r) {
+			auto it = std::find_if( g_regions.begin(), g_regions.end(), [=] (cv::Rect r) {
 																		auto cross = r & roi;
 																		return ((double)cross.area()/r.area() >= 0.9);
 																	} );
-			if( it == regions.end() && ocr_idx < OCR_MAX )
+			if( it == g_regions.end() && ocr_idx < OCR_MAX )
 			{
 				if( param.algo_t == ALGO_CURRENT )
 				{
 					cv::Mat img_roi = param.img(roi);					
 					worker.add( std::make_tuple(roi, img_roi) );
-					// worker.add( t );
 					continue;
 				}
-				// futures.push_back( std::async( find_places_by_text, std::ref(param), roi, ocr_idx ) );
-				pool.push_back( std::thread( find_places_by_text, std::ref(param), roi, ocr_idx ) );
+				g_pool.push_back( std::thread( find_places_by_text, std::ref(param), roi, ocr_idx ) );
+				g_regions.push_back(roi);
 				++ocr_idx;
-				regions.push_back(roi);
 			}
 		}
 	}
+	for( auto& t: g_pool ) t.join();
 
-	for( auto& t: pool )
-		t.join();
-	// for( auto& f: futures )
-	// 	f.get();
-
-
-	// for( auto f = futures.begin(); f != futures.end(); ++f )
-	// 	f->get();
 	return true;
 }
 
