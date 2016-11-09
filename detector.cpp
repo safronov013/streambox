@@ -25,7 +25,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 
 	regions.reserve(32);
 	contours.reserve(1028);
-	if( algo_t == ALGO_CURRENT ) reccurence = 2;
+	if( algo_t == ALGO_CURRENT ) reccurence = 1;
 }
 
 std::mutex mutex_push;
@@ -90,29 +90,30 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	ocr_item.SetImage( img.data, img.cols, img.rows, 1, img.step );
 	std::string str = ocr_item.GetUTF8Text();
 
-	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' '); } );
+	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' ' || c <= 0); } );
 	if( new_end != str.end() ) str.erase( new_end, str.end() );
 
 	if( str.size() > 10 ) str.resize(10);
-	if( str.size() > 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
+	if( str.size() >= 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
 	{
 		for( auto c: str )
 		{
+			// printf( "%d=%X=%c\n", c, c, c );
 			if( c == 'l' || c == 'i' ) c = '1';
 			if( isupper(c) || isdigit(c) ) ++alpha_digit;
 		}
 		ret = (alpha_digit/str.size() >= 0.6);
-		// if(ret)
+		if(ret)
 		{
 			// if( str.size() == 8 && alpha_digit/str.size() == 1 )
 			// 	searched_str = str;
-			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
+			std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
-		// else
-		// 	std::cout << alpha_digit/str.size() << std::endl;
+		else
+			std::cout << alpha_digit/str.size() << std::endl;
 	}
-	// std::cout << "\ttext = " << str << std::endl;
-	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+	std::cout << "\ttext = " << str << std::endl;
+	std::cout << "\talpha_digit = " << alpha_digit << std::endl;
 
 	return ret;
 }
@@ -227,7 +228,7 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 				if( box.height > 40 ) 	box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					// std::cout << "box = " << box << std::endl;
+					std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -280,7 +281,8 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
 
 	// cv::imshow( "img", param.img );
-	// cv::waitKey(1000);
+	cv::imshow( "img_", param.img_dilated );
+	cv::waitKey(1000);
 	find_text_regions( param.img_dilated, param.regions, param.contours );
 
 	return true;
@@ -369,8 +371,9 @@ int stat_size = 100;
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	++frame_cnt;
+	std::cout << "#" << frame_cnt << "-------------------" << std::endl;
 
-	// if( frame_cnt < 170 ) return;
+	if( frame_cnt < 11 ) return;
 	if( g )
 	{
 		auto beg = cv::getTickCount();
@@ -384,8 +387,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 
 				for( auto param: params )
 				{
-					cv::Mat tmp = frame_curr(param.roi_place);
-					hide_text( tmp );
+					// cv::Mat tmp = frame_curr(param.roi_place);
+					// hide_text( tmp );
+					draw_rectangle(frame_curr, param.roi_place);
 				}
 
 				std::lock_guard<std::mutex> lg(g_mutex);
@@ -394,8 +398,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					{
 						if( r.left > 0 )
 						{
-							cv::Mat tmp = frame_curr(r.roi_norm);
-							hide_text( tmp );
+							// cv::Mat tmp = frame_curr(r.roi_norm);
+							// hide_text( tmp );
+							draw_rectangle(frame_curr, r.roi_norm);
 							--r.left;
 						}
 					}
@@ -414,7 +419,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		if( frame_cnt % stat_size != 0 );
 		else
 		{
-			std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
+			// std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
 			tm_full_prev = tm_full;
 		}
 	}
