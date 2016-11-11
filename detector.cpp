@@ -222,8 +222,8 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 		{
 			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
-		else
-			std::cout << alpha_digit/str.size() << std::endl;
+		// else
+		// 	std::cout << alpha_digit/str.size() << std::endl;
 	}
 	// std::cout << "\ttext = " << str << std::endl;
 	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
