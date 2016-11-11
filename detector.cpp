@@ -25,11 +25,127 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 
 	regions.reserve(32);
 	contours.reserve(1028);
-	if( algo_t == ALGO_CURRENT ) reccurence = 1;
+	if( algo_t == ALGO_CURRENT ) reccurence = 2;
 }
 
 std::mutex mutex_push;
 std::vector<tesseract::TessBaseAPI> ocr;
+
+// double optical_flow_to_shift( const cv::Mat& flow, cv::Mat& img )
+// {
+// 	int step = 8;
+// 	double shift_x = 0;
+// 	int cnt = 0;
+
+// 	for( int x = 0; x < img.rows; x += step )
+// 	{
+// 		for( int y = 0; y < img.cols; y += step )
+// 		{
+// 			cv::Point2f pt = flow.at<cv::Point2f>(x, y);
+// 			shift_x += std::abs(pt.x);
+// 			++cnt;
+// 			// std::cout << shift_x/cnt << std::endl;
+// 		}
+// 	}
+// 	return shift_x/cnt;
+// }
+
+// std::pair<double,double> draw_optical_flow( const cv::Mat& flow, cv::Mat& img )
+// {
+// 	int stepSize = 5;
+// 	// cv::Scalar color = cv::Scalar(255, 255, 255);
+// 	cv::Scalar color = cv::Scalar(0,0,0);
+
+// 	double shift_x = 0;
+// 	double shift_y = 0;
+// 	int cnt = 0;
+// 	int y = 0, x = 0;
+
+// 	for(y = 0; y < img.rows; y += stepSize)
+// 	{
+// 		for(x = 0; x < img.cols; x += stepSize)
+// 		{
+// 			// Circles to indicate the uniform grid of points
+// 			// cv::circle( img, cv::Point(x,y), 2, color, -1 );
+// 			// Lines to indicate the motion vectors
+// 			cv::Point2f pt = flow.at<cv::Point2f>(y, x);
+// 			double res = cv::norm( cv::Point(cvRound(x+pt.x), cvRound(y+pt.y)) - cv::Point(x,y) );
+// 			if( res )
+// 			{
+// 				// std::cout << res << std::endl;
+// 				cv::circle( img, cv::Point(cvRound(x+pt.x), cvRound(y+pt.y)), 3	, color, -1 );
+// 				// cv::line( img, cv::Point(x,y), cv::Point(cvRound(x+pt.x), cvRound(y+pt.y)), color, 1 );
+// 			}
+// 			// if( cv::norm(  ) )
+
+
+
+// 			shift_x += pt.x;
+// 			shift_y += pt.y;
+// 			++cnt;
+// 		}
+// 	}
+// 	std::cout << shift_x << "," << shift_y << ": " << cnt << "  " << x*y << std::endl;
+
+// 	return std::make_pair(shift_x/cnt, shift_y/cnt);
+// 	// std::cout << cnt << "  " << shift_x << " " << shift_x/cnt;
+// }
+
+// cv::Mat get_cropped( cv::Mat input, const cv::Rect& box )
+// {
+// 	cv::Mat cropped;
+// 	cv::getRectSubPix( input, box.size(), cv::Point(box.x+box.width/2, box.y+box.height/2), cropped );
+// 	// cv::copyMakeBorder( cropped, cropped, 10, 10, 10, 10, cv::BORDER_CONSTANT, cv::Scalar(0) );
+// 	return cropped;
+// }
+
+// #include <opencv2/video/tracking.hpp>
+
+// void foo( cv::Mat& img1, cv::Mat& img2 )
+// {
+// 	cv::Mat flow, flow_gray, img_cropped, img_diff, img_bitwise;
+
+// 	cv::calcOpticalFlowFarneback( img1, img2, flow, 0.5, 3, 15, 3, 5, 1.2, cv::OPTFLOW_USE_INITIAL_FLOW );
+// 	flow_gray = img1.clone();
+// 	auto shift = draw_optical_flow( flow, flow_gray );
+
+// 	// double shift_x = optical_flow_to_shift( flow, flow_gray );
+// 	// std::cout << "shift = " << shift.first << ", " << shift.second << std::endl;
+
+// 	// auto cropped1 = get_cropped( img1, cv::Rect( 11, 0, img1.cols, img1.rows) );
+// 	// auto cropped2 = get_cropped( img2, cv::Rect( 0, 0, img2.cols, img2.rows) );
+// 	// // // cv::imshow( "flow", img1 );
+// 	// // cv::imshow( "cropped1", cropped1 );
+// 	// // cv::imshow( "cropped2", cropped2 );
+
+// 	// cv::absdiff( cropped1, cropped2, img_cropped );
+// 	cv::absdiff( img1, img2, img_diff );
+// 	// // cv::bitwise_and( cropped2, img_cropped, img_bitwise );
+// 	// cv::imshow( "img", img_cropped );
+// 	// cv::imshow( "img", img_diff );
+// 	// cv::imshow( "img", img_bitwise );
+
+// 	cv::imshow( "flow", flow_gray );
+// 	cv::waitKey(1000);
+
+// 	// draw_optical_flow( flow, flow_gray );
+
+// 	// double shift_x = optical_flow_to_shift( flow, flow_gray );
+// 	// // double shift_x = 22;
+
+// 	// std::cout << "optical_flow_to_shift() = " << shift_x << std::endl;
+
+// 	// auto cropped1 = get_cropped( tmp1, cv::Rect( 0, 0, img1.cols, img1.rows) );
+// 	// auto cropped2 = get_cropped( tmp2, cv::Rect( 18, 0, img2.cols, img2.rows) );
+// 	// // cv::imshow( "flow", img1 );
+// 	// cv::imshow( "cropped1", cropped1 );
+// 	// cv::imshow( "cropped2", cropped2 );
+
+// 	// auto img_cropped_diff = get_diff( cropped1, cropped2 );
+// 	// // img_cropped_diff = get_diff( img_diff, img_cropped_diff );
+// 	// cv::imshow( "img", img_cropped_diff );
+// }
+
 
 void tesseract_init()
 {
@@ -94,26 +210,23 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	if( new_end != str.end() ) str.erase( new_end, str.end() );
 
 	if( str.size() > 10 ) str.resize(10);
-	if( str.size() >= 6 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[2] == '0' ) )
+	if( str.size() >= 5 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[2] == '0' ) )
 	{
 		for( auto c: str )
 		{
-			// printf( "%d=%X=%c\n", c, c, c );
 			if( c == 'l' || c == 'i' ) c = '1';
 			if( isupper(c) || isdigit(c) ) ++alpha_digit;
 		}
 		ret = (alpha_digit/str.size() >= 0.6);
 		if(ret)
 		{
-			// if( str.size() == 8 && alpha_digit/str.size() == 1 )
-			// 	searched_str = str;
-			std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
+			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 		}
 		else
 			std::cout << alpha_digit/str.size() << std::endl;
 	}
-	std::cout << "\ttext = " << str << std::endl;
-	std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+	// std::cout << "\ttext = " << str << std::endl;
+	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
 
 	return ret;
 }
@@ -211,24 +324,21 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 		{
 			auto box = rotated_box.boundingRect();
 
-			// if( box.width >= 70 && box.width <= 400 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
+			// if( box.width >= 100 && box.width <= 400 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
 			// if( box.width >= 95 && box.width <= 250 )
 			// {
-			// 	std::cout << "box0 = " << box << std::endl;
-			// 	// cv::imshow( "label", img(box) );
-			// 	// cv::waitKey(500);
-
+				// std::cout << "box0 = " << box << std::endl;
+				// cv::imshow( "label", img(box) );
+				// cv::waitKey(500);
 			// }
 
-
-			// if( box.width >= 171 && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
-			if( (box.width >= 171 || (box.x > 1700 && box.width >= 150)) && box.width <= 223 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
+			if( (box.width >= 133 || (box.x > 1700 && box.width >= 110)) && box.width <= 233 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
 				if( box.height <= 19 ) { box.y -= 2; box.height += 4; }
 				if( box.height > 40 ) 	box.height = 30;
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 				{
-					std::cout << "box = " << box << std::endl;
+					// std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -281,8 +391,8 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g )
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
 
 	// cv::imshow( "img", param.img );
-	cv::imshow( "img_", param.img_dilated );
-	cv::waitKey(1000);
+	// cv::imshow( "img_", param.img_dilated );
+	// cv::waitKey(1000);
 	find_text_regions( param.img_dilated, param.regions, param.contours );
 
 	return true;
@@ -371,9 +481,8 @@ int stat_size = 100;
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	++frame_cnt;
-	std::cout << "#" << frame_cnt << "-------------------" << std::endl;
 
-	if( frame_cnt < 11 ) return;
+	// if( frame_cnt < 87 ) return;
 	if( g )
 	{
 		auto beg = cv::getTickCount();
@@ -387,9 +496,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 
 				for( auto param: params )
 				{
-					// cv::Mat tmp = frame_curr(param.roi_place);
-					// hide_text( tmp );
-					draw_rectangle(frame_curr, param.roi_place);
+					cv::Mat tmp = frame_curr(param.roi_place);
+					hide_text( tmp );
+					// draw_rectangle(frame_curr, param.roi_place);
 				}
 
 				std::lock_guard<std::mutex> lg(g_mutex);
@@ -398,15 +507,15 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					{
 						if( r.left > 0 )
 						{
-							// cv::Mat tmp = frame_curr(r.roi_norm);
-							// hide_text( tmp );
-							draw_rectangle(frame_curr, r.roi_norm);
+							cv::Mat tmp = frame_curr(r.roi_norm);
+							hide_text( tmp );
+							// draw_rectangle(frame_curr, r.roi_norm);
 							--r.left;
 						}
 					}
 				}
 				// cv::imshow( "detector", frame_curr );
-				// cv::waitKey(500);
+				// cv::waitKey(1000);
 			}
 		}
 		g->frame_prev_gray = g->frame_curr_gray.clone();
@@ -419,7 +528,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		if( frame_cnt % stat_size != 0 );
 		else
 		{
-			// std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
+			std::cout << frame_cnt << ": " << tm_full << " msec, average: " << tm_full/frame_cnt << " msec/frame, delta_average: " << (tm_full - tm_full_prev)/stat_size << " msec/frame" << std::endl;
 			tm_full_prev = tm_full;
 		}
 	}

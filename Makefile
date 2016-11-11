@@ -50,11 +50,10 @@ $(TARGET):
 	$(CXX) $(CXXFLAGS) $@.o -o $@ $(LIBS) $(addprefix -l, $(DEPLIBS)) $(addprefix -l, $(FFMPEGLIB))
 	strip $@
 #	bzip2 -kf --best $@
-#	$(LXX) $@.o -o $@ $(LIBS) $(addprefix -l, $(DEPLIBS)) -lstdc++ -lm -lsocket++
 
 rm:
 	rm -f *.o
 	rm -f *.a
 	rm -f $(TARGET)
 	rm -f *.exe
-	rm -f 4.flv
+	rm -f out.flv
