@@ -31,14 +31,17 @@ typedef std::future<places_t> future_t;
 enum algorithm_t
 {
 	ALGO_DIFF=1,
-	ALGO_CURRENT
+	ALGO_CURRENT,
+	ALGO_DIFF_GREY
 };
 
 typedef struct _GPUVARS_S
 {
+	cv::gpu::GpuMat frame_prev;
 	cv::gpu::GpuMat frame_curr;
-	cv::gpu::GpuMat frame_curr_gray;
-	cv::gpu::GpuMat frame_prev_gray;
+	cv::gpu::GpuMat frame_grey_prev;
+	cv::gpu::GpuMat frame_grey_curr;
+	cv::gpu::GpuMat frame_grey_next;
 	cv::Mat img_curr_gray;
 } GPUVARS;
 
@@ -59,6 +62,7 @@ public:
 	cv::Mat img_dilated;
 	cv::Mat img_eroded;
 	cv::gpu::GpuMat gpu_img;
+	cv::gpu::GpuMat gpu_img_inv;
 	cv::gpu::GpuMat gpu_img_threshold;
 	cv::gpu::GpuMat gpu_blacked_prev;
 	cv::gpu::GpuMat gpu_blacked_curr;

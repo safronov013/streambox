@@ -93,6 +93,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
+		{ 120, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
 	};
 
 	std::thread t1( infinity_loop );

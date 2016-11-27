@@ -25,7 +25,8 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 
 	regions.reserve(32);
 	contours.reserve(1028);
-	if( algo_t == ALGO_CURRENT ) reccurence = 2;
+	if(algo_t == ALGO_CURRENT)		reccurence = 4;
+	if(algo_t == ALGO_DIFF_GREY)	reccurence = 4;
 }
 
 std::mutex mutex_push;
@@ -191,10 +192,7 @@ void hide_text( cv::Mat& img )
 			cv::Mat tmp = img(block);
 			set_px_average( tmp );
 		}
-		// cv::GaussianBlur( img, img, cv::Size(13,13), 0, 0 );
 		cv::blur( img, img, cv::Size(17,17) );
-		// for( int i = 1; i < 10; i +=2 )
-		// 	cv::GaussianBlur( img, img, cv::Size(i,i), 0, 0 );
 	}
 }
 
@@ -209,8 +207,11 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' ' || c <= 0); } );
 	if( new_end != str.end() ) str.erase( new_end, str.end() );
 
-	if( str.size() > 10 ) str.resize(10);
-	if( str.size() >= 5 && str.size() < 14 && (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[2] == '0' ) )
+	if(str.size() > 10) str.resize(10);
+	// std::cout << "\ttext = " << str << std::endl;
+	if(str.size() < 5 || str.size() > 11) return ret;
+	// if(str.find('8') == std::string::npos && str.find('B') == std::string::npos) return ret;
+	if(str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[2] == '0' )
 	{
 		for( auto c: str )
 		{
@@ -218,22 +219,45 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 			if( isupper(c) || isdigit(c) ) ++alpha_digit;
 		}
 		ret = (alpha_digit/str.size() >= 0.6);
-		if(ret)
-		{
-			// std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
-		}
-		// else
-		// 	std::cout << alpha_digit/str.size() << std::endl;
+		// if(ret)
+		// 	std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
 	}
-	// std::cout << "\ttext = " << str << std::endl;
-	// std::cout << "\talpha_digit = " << alpha_digit << std::endl;
+	return ret;
+}
 
+bool identify_text2( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
+{
+	bool ret = false;
+	double alpha_digit = 0;
+
+	ocr_item.SetImage( img.data, img.cols, img.rows, 1, img.step );
+	std::string str = ocr_item.GetUTF8Text();
+
+	auto new_end = std::remove_if( str.begin(), str.end(), [](char c) { return (c == '\n' || c == ' ' || c <= 0); } );
+	if( new_end != str.end() ) str.erase( new_end, str.end() );
+
+	if(str.size() > 10) str.resize(10);
+	// std::cout << "\ttext = " << str << std::endl;
+	if(str.size() < 5 || str.size() > 11) return ret;
+	if(str.find('8') == std::string::npos && str.find('B') == std::string::npos) return ret;
+	if(str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[2] == '0' || str[2] == '8' )
+	{
+		for( auto c: str )
+		{
+			if( c == 'l' || c == 'i' ) c = '1';
+			if( isupper(c) || isdigit(c) ) ++alpha_digit;
+		}
+		ret = (alpha_digit/str.size() >= 0.6);
+		// if(ret)
+		// 	std::cout << frame_cnt << " ---> " << str << "  " << alpha_digit << std::endl;
+	}
 	return ret;
 }
 
 void draw_rectangle( cv::Mat& input, const cv::Rect& box )
 {
 	cv::rectangle( input, box.tl(), box.br(), CV_RGB(255,0,0), 2, 4 );
+	// cv::rectangle( input, box.tl(), box.br(), CV_RGB(255,255,255), 2, 4 );
 }
 
 void draw_contours( std::vector<std::vector<cv::Point>> contours, cv::Size size )
@@ -295,10 +319,42 @@ inline void get_eroded( const cv::Mat& img, cv::Mat& img_eroded, const cv::Mat& 
 
 void get_bitand_diff( ImgParams& param, GPUVARS* g )
 {
-	cv::gpu::threshold( g->frame_prev_gray, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
-	cv::gpu::threshold( g->frame_curr_gray, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
+	// cv::gpu::threshold( g->frame_grey_prev, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
+	cv::gpu::threshold( g->frame_grey_curr, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
+	// cv::gpu::threshold( g->frame_grey_curr, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
+	cv::gpu::threshold( g->frame_grey_next, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
 	cv::gpu::absdiff( param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img_diff );
 	cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img );
+}
+
+cv::Mat src, dst;
+void get_bitand_diff2( ImgParams& param, GPUVARS* g )
+{
+	// cv::gpu::threshold( g->frame_prev_gray, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
+	// cv::gpu::threshold( g->frame_curr_gray, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
+	// cv::gpu::absdiff( g->frame_grey_prev, g->frame_grey_curr, param.gpu_img );
+	// cv::gpu::absdiff( g->frame_grey_curr, g->frame_grey_next, param.gpu_img );
+	// cv::Mat prev, next;
+	// g->frame_grey_prev.download(prev);
+	// g->frame_grey_next.download(next);
+	// cv::imshow("prev", prev);
+	// cv::imshow("next", next);
+
+	g->frame_curr.download(src);
+    // cv::inRange(src, cv::Scalar(0, 0, 0), cv::Scalar(50, 100, 255), dst);
+	cv::inRange(src, cv::Scalar(152,152,152), cv::Scalar(224,224,224), dst);
+    // cv::cvtColor(dst, dst_grey, CV_BGR2GRAY);
+	// cv::imshow("dst", dst);
+    param.gpu_img.upload(dst);
+
+    // cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY_INV);
+
+	/*cv::gpu::absdiff( g->frame_grey_curr, g->frame_grey_next, param.gpu_img );
+	// cv::gpu::absdiff( g->frame_grey_prev, g->frame_grey_next, param.gpu_img );
+	// cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY);
+	cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY_INV);
+	// cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img );*/
+
 }
 
 void set_black( cv::Mat& img )
@@ -312,10 +368,10 @@ void set_black( cv::Mat& img )
 
 void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std::vector<std::vector<cv::Point>>& contours )
 {
+	// auto t = img.clone();
 	get_contours( img, contours );
 	// std::cout << "contours.size() = " << contours.size() << std::endl;
 	// draw_contours( contours, img.size() );
-	// cv::waitKey(2000);
 
 	for( auto contour: contours )
 	{
@@ -325,12 +381,14 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 			auto box = rotated_box.boundingRect();
 
 			// if( box.width >= 100 && box.width <= 400 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
-			// if( box.width >= 95 && box.width <= 250 )
-			// {
+			// if( box.width >= 110 && box.width <= 290 )
+			{
 				// std::cout << "box0 = " << box << std::endl;
+				// draw_rectangle(t, box);
 				// cv::imshow( "label", img(box) );
 				// cv::waitKey(500);
-			// }
+				// regions.push_back(box);
+			}
 
 			if( (box.width >= 133 || (box.x > 1700 && box.width >= 110)) && box.width <= 233 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 )
 			{
@@ -344,7 +402,50 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 			}
 		}
 	}
+	// cv::imshow("t", t);
+	// cv::waitKey(500);
 }
+
+void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std::vector<std::vector<cv::Point>>& contours )
+{
+	// auto t = img.clone();
+	get_contours( img, contours );
+	// std::cout << "contours.size() = " << contours.size() << std::endl;
+	// draw_contours( contours, img.size() );
+
+	for( auto contour: contours )
+	{
+		auto rotated_box = cv::minAreaRect(contour);
+		// if( rotated_box.angle < 15 || rotated_box.angle > 345 )
+		{
+			auto box = rotated_box.boundingRect();
+
+			// if( box.width >= 100 && box.width <= 400 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
+			// if( box.width >= 110 && box.width <= 290 )
+			{
+				// std::cout << "box0 = " << box << std::endl;
+				// draw_rectangle(t, box);
+				// cv::imshow( "label", img(box) );
+				// cv::waitKey(500);
+				// regions.push_back(box);
+			}
+
+			if( box.width >= 167 && box.width <= 220 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 && box.y < 600 )
+			{
+				if( box.height <= 19 ) { box.y -= 2; box.height += 4; }
+				if( box.height > 40 ) 	box.height = 30;
+				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
+				{
+					// std::cout << "box = " << box << std::endl;
+					regions.push_back(box);
+				}
+			}
+		}
+	}
+	// cv::imshow("t", t);
+	// cv::waitKey(500);
+}
+
 
 void del_small_areas( const cv::Mat& img )
 {
@@ -370,30 +471,45 @@ void del_small_areas( const cv::Mat& img )
 	return;
 }
 
-bool find_places_by_size( ImgParams& param, GPUVARS* g )
+cv::Mat img_hsv;
+bool find_places_by_size( ImgParams& param, GPUVARS* g, const cv::Mat& frame_curr )
 {
-	if( param.algo_t == ALGO_DIFF )
+	if( param.algo_t == ALGO_DIFF_GREY )
 	{
-		get_bitand_diff( param, g );
+		// get_bitand_diff2( param, g );
+		// cv:cvtColor(frame_curr, img_hsv, CV_BGR2HSV);
+		// cv::inRange(img_hsv, cv::Scalar(60,0,0), cv::Scalar(88,255,255), param.img);
+		cv::inRange(frame_curr, cv::Scalar(152,152,152), cv::Scalar(224,224,224), param.img);
+		param.img_threshold = param.img.clone();
+		// cv::gpu::threshold(g->frame_grey_next, param.gpu_img, 145, 0, CV_THRESH_TOZERO);
+		// cv::gpu::threshold(param.gpu_img, param.gpu_img, 200, 0, CV_THRESH_TOZERO_INV);
 	}
 	else
 	{
-		cv::gpu::threshold( g->frame_curr_gray, param.gpu_img, 170, 255, CV_THRESH_TOZERO );
+		if( param.algo_t == ALGO_DIFF )
+		{
+			get_bitand_diff( param, g );
+		}
+		else
+		{
+			// cv::gpu::threshold( g->frame_grey_curr, param.gpu_img, param.threshold, 255, CV_THRESH_TOZERO );
+			cv::gpu::threshold( g->frame_grey_next, param.gpu_img, param.threshold, 255, CV_THRESH_TOZERO );
+		}
+		get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
+		param.gpu_img.download(param.img);
+		param.gpu_img_threshold.download(param.img_threshold);
 	}
-	param.gpu_img.download(param.img);
-
-	del_small_areas( param.img );
-
-	get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
-	param.gpu_img_threshold.download(param.img_threshold);
-
+	del_small_areas( param.img_threshold );
 	get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
-
+	
 	// cv::imshow( "img", param.img );
 	// cv::imshow( "img_", param.img_dilated );
 	// cv::waitKey(1000);
-	find_text_regions( param.img_dilated, param.regions, param.contours );
+	if(param.algo_t == ALGO_DIFF_GREY)
+		find_text_regions2( param.img_dilated, param.regions, param.contours );
+	else
+		find_text_regions( param.img_dilated, param.regions, param.contours );
 
 	return true;
 }
@@ -412,8 +528,14 @@ void roi_normalize( cv::Rect& roi, int width, int height )
 bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 {
 	auto img_roi = param.img(roi);
+	bool ret = false;
 
-	if( identify_text( img_roi, ocr[ocr_idx] ) )
+	if(param.algo_t == ALGO_DIFF_GREY)
+		ret = identify_text2( img_roi, ocr[ocr_idx] );
+	else
+		ret = identify_text( img_roi, ocr[ocr_idx] );
+
+	if( ret )
 	{
 		mutex_push.lock();
 		param.roi_place = roi;
@@ -428,7 +550,7 @@ std::vector<std::future<bool>> g_futures;
 std::vector<std::thread> g_pool;
 std::vector<cv::Rect> g_regions;
 
-bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
+bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g, const cv::Mat& frame_curr )
 {
 	g_futures.clear();
 	g_pool.clear();
@@ -438,11 +560,11 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 	{
 		param.regions.erase( param.regions.begin(), param.regions.end() );
 		param.contours.erase( param.contours.begin(), param.contours.end() );
-		if( param.algo_t == ALGO_CURRENT )
+		if(param.algo_t == ALGO_CURRENT || param.algo_t == ALGO_DIFF_GREY)
 		{
 			if( param.reccurence > 1 && frame_cnt % param.reccurence != 0 ) continue;
 		}
-		g_futures.push_back( std::async( find_places_by_size, std::ref(param), g ) );
+		g_futures.push_back( std::async( find_places_by_size, std::ref(param), g, std::cref(frame_curr) ) );
 	}
 	for( auto& f: g_futures ) f.get();
 
@@ -457,6 +579,11 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g )
 																	} );
 			if( it == g_regions.end() && ocr_idx < OCR_MAX )
 			{
+				// cv::imshow( "label", param.img(roi) );
+				// cv::waitKey(500);
+				auto cross = param.roi_place & roi;
+				if( (double)cross.area()/roi.area() >= 0.9 ) continue;
+
 				if( param.algo_t == ALGO_CURRENT )
 				{
 					cv::Mat img_roi = param.img(roi);					
@@ -481,18 +608,24 @@ int stat_size = 100;
 void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUVARS* g )
 {
 	++frame_cnt;
+	// std::cout << frame_cnt << std::endl;
 
-	// if( frame_cnt < 87 ) return;
+	// if( frame_cnt < 17 ) return;
+	// if( frame_cnt < 145 ) return;
+	// if( frame_cnt < 262 ) return;
 	if( g )
 	{
 		auto beg = cv::getTickCount();
 		if( !frame_curr.empty() )
 		{
 			g->frame_curr.upload(frame_curr);
-			cv::gpu::cvtColor( g->frame_curr, g->frame_curr_gray, CV_BGR2GRAY );
-			if( !g->frame_prev_gray.empty() )
+			// cv::gpu::cvtColor( g->frame_curr, g->frame_grey_curr, CV_BGR2GRAY );
+			cv::gpu::cvtColor( g->frame_curr, g->frame_grey_next, CV_BGR2GRAY );
+			// if( !g->frame_grey_prev.empty() )
+			// if( !g->frame_grey_curr.empty() && !g->frame_grey_prev.empty() )
+			if( !g->frame_grey_curr.empty() )
 			{
-				find_places_entry( params, g );
+				find_places_entry( params, g, frame_curr );
 
 				for( auto param: params )
 				{
@@ -507,18 +640,21 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					{
 						if( r.left > 0 )
 						{
-							cv::Mat tmp = frame_curr(r.roi_norm);
-							hide_text( tmp );
-							// draw_rectangle(frame_curr, r.roi_norm);
+							// cv::Mat tmp = frame_curr(r.roi_norm);
+							// hide_text( tmp );
+							draw_rectangle(frame_curr, r.roi_norm);
 							--r.left;
 						}
 					}
 				}
 				// cv::imshow( "detector", frame_curr );
-				// cv::waitKey(1000);
+				// cv::waitKey(1);
 			}
+			g->frame_prev = g->frame_curr.clone();
 		}
-		g->frame_prev_gray = g->frame_curr_gray.clone();
+		// g->frame_grey_prev = g->frame_grey_curr.clone();
+		// g->frame_grey_prev = g->frame_grey_curr.clone();
+		g->frame_grey_curr = g->frame_grey_next.clone();
 
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 		tm_full += frame_tm;
