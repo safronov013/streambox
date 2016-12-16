@@ -87,13 +87,13 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 	GPUVARS g;
 	g.frame_curr.upload(cvframe);
 	std::vector<ImgParams> params = {
-		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		// { 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
+		{ 120, 12, cv::Size(3,1), cv::Size(2,2), ALGO_DIFF_GREY },
 		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
-		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
-		{ 120, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
 	};
 
 	std::thread t1( infinity_loop );
@@ -116,6 +116,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 						if( pkt.stream_index == ctx->v_idx )
 						{
 							avframe_update( ctx->frame, &g, params );
+							continue;
 							if( avstream_encode_video_packet( ctx, &out_pkt, avframe_dst ) )
 							{
 								if( !avstream_write_packet( ctx, &out_pkt ) )
@@ -128,6 +129,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
 						}
 						else
 						{
+							continue;
 							if( avstream_encode_audio_packet( ctx, &out_pkt, ctx->frame ) )
 							{
 								if( !avstream_write_packet2( ctx, &out_pkt ) )
