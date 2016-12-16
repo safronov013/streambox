@@ -331,21 +331,21 @@ void get_bitand_diff( ImgParams& param, GPUVARS* g )
 }
 
 cv::Mat img_hsv;
-cv::Scalar GREY_HSV_MIN(0, 5, 145);
-cv::Scalar GREY_HSV_MAX(180, 70, 200);
+cv::Scalar GREY_HSV_MIN(0, 0, 130);
+cv::Scalar GREY_HSV_MAX(180, 80, 198);
 // cv::Scalar GREY_HSV_MIN(0, 5, 152);
 // cv::Scalar GREY_HSV_MAX(180, 80, 200);
 void get_bitand_diff2( ImgParams& param, GPUVARS* g, const cv::Mat& frame_curr )
 {
-	cv::gpu::threshold( g->frame_grey_next, param.gpu_img, 198, 255, CV_THRESH_TOZERO_INV );
+	cv::gpu::threshold( g->frame_grey_next, param.gpu_img, 193, 255, CV_THRESH_TOZERO_INV );
 	cv::gpu::threshold(param.gpu_img, param.gpu_img, 110, 255, CV_THRESH_BINARY);
 	param.gpu_img.download(param.img);
 
 	cv::cvtColor(frame_curr, img_hsv, CV_BGR2HSV);
 	cv::inRange(img_hsv, GREY_HSV_MIN, GREY_HSV_MAX, img_hsv);
 
-	param.img = img_hsv.clone();
-	// cv::bitwise_and(param.img, img_hsv, param.img);
+	// param.img = img_hsv.clone();
+	cv::bitwise_and(param.img, img_hsv, param.img);
 }
 
 
@@ -550,7 +550,7 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g, const cv::Mat& frame_cur
 	get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
 	
-	cv::imshow( "img", param.img );
+	// cv::imshow( "img", param.img );
 	// cv::imshow( "img_", param.img_dilated );
 	// cv::imshow( "img_", param.img_eroded );
 	if(param.algo_t == ALGO_DIFF || param.algo_t == ALGO_CURRENT)
@@ -585,6 +585,7 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	if( ret )
 	{
 		mutex_push.lock();
+		std::cout << "\t\t" << roi << std::endl;
 		param.roi_place = roi;
 		param.roi_place_origin = roi;
 		roi_normalize( param.roi_place, param.img.cols, param.img.rows );
@@ -658,9 +659,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 {
 	++frame_cnt;
 
-	if( frame_cnt < 900 ) return;
+	// if( frame_cnt < 900 ) return;
 	// cv::imwrite("4.jpg", frame_curr);
-	std::cout << frame_cnt << std::endl;
+	// std::cout << frame_cnt << std::endl;
 	if( g )
 	{
 		auto beg = cv::getTickCount();
@@ -696,7 +697,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					}
 				}
 				// cv::imshow("detector", frame_curr);
-				cv::waitKey(500);
+				// cv::waitKey(500);
 			}
 			g->frame_prev = g->frame_curr.clone();
 		}

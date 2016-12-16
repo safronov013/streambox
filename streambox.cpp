@@ -82,14 +82,15 @@ void infinity_loop()
 	worker.listen();
 }
 
-void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination )
+void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spec_color )
 {
 	GPUVARS g;
 	g.frame_curr.upload(cvframe);
 	std::vector<ImgParams> params = {
-		// { 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
-		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
-		{ 120, 12, cv::Size(3,1), cv::Size(2,2), ALGO_DIFF_GREY },
+		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
+		{ 150, 16, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
+		{ 120, 12, cv::Size(3,1), cv::Size(2,2), ALGO_CURRENT_GREY },
 		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
@@ -165,18 +166,19 @@ int main( int argc, char* argv[] )
 {
 	int ret = 0;
 
-	if( argc != 3 ) return 0;
+	if( argc != 3 && argc != 4 ) return 0;
 
 	if( cvt_init() != true ) return 0;
 	char* source = argv[1];
 	char* destination = argv[2];
+	char* spec_color = (argc == 4) ? argv[3] : (char*)"--white_grey";
 	AVSTREAMCTX ctx;
 
 	memset( &ctx, 0, sizeof(ctx) );
 	tesseract_init();
 	avstream_init();
 
-	avstream_main( &ctx, source, destination );
+	avstream_main(&ctx, source, destination, spec_color);
 
 	avstream_close_input(&ctx);
 	avstream_close_output(&ctx);
