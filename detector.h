@@ -32,7 +32,8 @@ enum algorithm_t
 {
 	ALGO_DIFF=1,
 	ALGO_CURRENT,
-	ALGO_DIFF_GREY
+	ALGO_DIFF_GREY,
+	ALGO_CURRENT_GREY,
 };
 
 typedef struct _GPUVARS_S
@@ -74,6 +75,7 @@ public:
 	std::vector<std::vector<cv::Point>> contours;
 	places_t places;
 	cv::Rect roi_place;
+	cv::Rect roi_place_origin;
 	ImgParams();
 	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a );
 	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param );

@@ -26,7 +26,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 	regions.reserve(32);
 	contours.reserve(1028);
 	if(algo_t == ALGO_CURRENT)		reccurence = 4;
-	if(algo_t == ALGO_DIFF_GREY)	reccurence = 1;
+	if(algo_t == ALGO_CURRENT_GREY)	reccurence = 1;
 }
 
 std::mutex mutex_push;
@@ -237,7 +237,7 @@ bool identify_text2( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	if( new_end != str.end() ) str.erase( new_end, str.end() );
 
 	if(str.size() > 10) str.resize(10);
-	std::cout << "\t" << img.cols << "x" << img.rows << "\ttext = " << str << std::endl;
+	// std::cout << "\t" << img.cols << "x" << img.rows << "\ttext = " << str << std::endl;
 	if(str.size() < 5 || str.size() > 11) return ret;
 	// if(str.find('8') == std::string::npos && str.find('B') == std::string::npos) return ret;
 	if( (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[0] == 'J' || str[0] == 'I' || str[0] == '1' || str[0] == '\\' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[1] == 'Q' || str[1] == 'B' || str[2] == '0' || str[2] == '8' || str[2] == 'I') ||
@@ -330,34 +330,38 @@ void get_bitand_diff( ImgParams& param, GPUVARS* g )
 	cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img );
 }
 
-cv::Mat src, dst;
-void get_bitand_diff2( ImgParams& param, GPUVARS* g )
+cv::Mat img_hsv;
+cv::Scalar GREY_HSV_MIN(0, 5, 145);
+cv::Scalar GREY_HSV_MAX(180, 70, 200);
+// cv::Scalar GREY_HSV_MIN(0, 5, 152);
+// cv::Scalar GREY_HSV_MAX(180, 80, 200);
+void get_bitand_diff2( ImgParams& param, GPUVARS* g, const cv::Mat& frame_curr )
 {
-	// cv::gpu::threshold( g->frame_prev_gray, param.gpu_blacked_prev, 220, 255, CV_THRESH_TOZERO );
-	// cv::gpu::threshold( g->frame_curr_gray, param.gpu_blacked_curr, 220, 255, CV_THRESH_TOZERO );
-	// cv::gpu::absdiff( g->frame_grey_prev, g->frame_grey_curr, param.gpu_img );
-	// cv::gpu::absdiff( g->frame_grey_curr, g->frame_grey_next, param.gpu_img );
-	// cv::Mat prev, next;
-	// g->frame_grey_prev.download(prev);
-	// g->frame_grey_next.download(next);
-	// cv::imshow("prev", prev);
-	// cv::imshow("next", next);
+	cv::gpu::threshold( g->frame_grey_next, param.gpu_img, 198, 255, CV_THRESH_TOZERO_INV );
+	cv::gpu::threshold(param.gpu_img, param.gpu_img, 110, 255, CV_THRESH_BINARY);
+	param.gpu_img.download(param.img);
 
-	g->frame_curr.download(src);
-    // cv::inRange(src, cv::Scalar(0, 0, 0), cv::Scalar(50, 100, 255), dst);
-	cv::inRange(src, cv::Scalar(152,152,152), cv::Scalar(224,224,224), dst);
-    // cv::cvtColor(dst, dst_grey, CV_BGR2GRAY);
-	// cv::imshow("dst", dst);
-    param.gpu_img.upload(dst);
+	cv::cvtColor(frame_curr, img_hsv, CV_BGR2HSV);
+	cv::inRange(img_hsv, GREY_HSV_MIN, GREY_HSV_MAX, img_hsv);
 
-    // cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY_INV);
+	param.img = img_hsv.clone();
+	// cv::bitwise_and(param.img, img_hsv, param.img);
+}
 
-	/*cv::gpu::absdiff( g->frame_grey_curr, g->frame_grey_next, param.gpu_img );
-	// cv::gpu::absdiff( g->frame_grey_prev, g->frame_grey_next, param.gpu_img );
-	// cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY);
-	cv::gpu::threshold(param.gpu_img, param.gpu_img, 50, 255, CV_THRESH_BINARY_INV);
-	// cv::gpu::bitwise_and( param.gpu_blacked_curr, param.gpu_img_diff, param.gpu_img );*/
 
+void get_bitand_diff3( ImgParams& param, GPUVARS* g )
+{
+	cv::gpu::threshold( g->frame_grey_curr, param.gpu_blacked_prev, param.threshold, 255, CV_THRESH_TOZERO );
+	cv::gpu::threshold( g->frame_grey_next, param.gpu_blacked_curr, param.threshold, 255, CV_THRESH_TOZERO );
+	cv::gpu::absdiff(param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img);
+
+	cv::gpu::threshold(param.gpu_img, param.gpu_img, 188, 255, CV_THRESH_TOZERO_INV);
+	// // cv::gpu::threshold( g->frame_grey_next, param.gpu_img, 205, 255, CV_THRESH_TOZERO_INV );
+	cv::gpu::bitwise_and(param.gpu_img, param.gpu_blacked_curr, param.gpu_img);
+
+	// cv::gpu::threshold(param.gpu_img, param.gpu_img, param.threshold, 255, CV_THRESH_BINARY);
+	
+	param.gpu_img.download(param.img);
 }
 
 void set_black( cv::Mat& img )
@@ -405,8 +409,6 @@ void find_text_regions( const cv::Mat& img, std::vector<cv::Rect>& regions, std:
 			}
 		}
 	}
-	// cv::imshow("t", t);
-	// cv::waitKey(500);
 }
 
 void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std::vector<std::vector<cv::Point>>& contours )
@@ -441,7 +443,7 @@ void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std
 				// if( box.y > 1033 ) { box.y = 1055; box.height = 25; }
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height <= img.rows )
 				{
-					std::cout << "box = " << box << std::endl;
+					// std::cout << "box = " << box << std::endl;
 					regions.push_back(box);
 				}
 			}
@@ -487,7 +489,6 @@ void del_small_areas2( const cv::Mat& img )
 
 		if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
 		{
-			// if( box.height < 6 || ( box.width < 8 && box.height < 8 ) )
 			if( box.height < 5 && box.width < 8 )
 			{
 				cv::Mat tmp = img(box);
@@ -498,50 +499,47 @@ void del_small_areas2( const cv::Mat& img )
 	return;
 }
 
+void del_small_areas3( const cv::Mat& img )
+{
+	cv::Mat img_clone = img.clone();
+	std::vector<std::vector<cv::Point>> contours;
+	get_contours( img_clone, contours );
+	int deleted = 0;
 
-cv::Mat img_hsv;
-int grey_value_min = 150;
-int grey_value_max = 214;
-cv::Scalar GREY_MIN(grey_value_min,grey_value_min,grey_value_min);
-cv::Scalar GREY_MAX(grey_value_max,grey_value_max,grey_value_max);
-// cv::Scalar GREY_HSV_MIN(50, 50, 0);
-cv::Scalar GREY_HSV_MIN(0, 0, 130);
-cv::Scalar GREY_HSV_MAX(180, 80, 199);
+	for( auto contour: contours )
+	{
+		auto box2 = cv::minAreaRect(contour);
+		auto box = box2.boundingRect();
+
+		if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height < img.rows )
+		{
+			if( box.height < 11 || box.width < 5 )
+			{
+				cv::Mat tmp = img(box);
+				set_black( tmp );
+			}
+		}
+	}
+	return;
+}
 
 bool find_places_by_size( ImgParams& param, GPUVARS* g, const cv::Mat& frame_curr )
 {
-	if( param.algo_t == ALGO_DIFF_GREY )
-	{
-		int threshold_val = 110;
-		cv::gpu::threshold( g->frame_grey_curr, param.gpu_blacked_prev, threshold_val, 255, CV_THRESH_TOZERO );
-		cv::gpu::threshold( g->frame_grey_next, param.gpu_blacked_curr, threshold_val, 255, CV_THRESH_TOZERO );
-		cv::gpu::absdiff(param.gpu_blacked_prev, param.gpu_blacked_curr, param.gpu_img);
-
-		cv::gpu::threshold(param.gpu_img, param.gpu_img, 205, 255, CV_THRESH_TOZERO_INV);
-		// cv::gpu::threshold( g->frame_grey_next, param.gpu_img, 205, 255, CV_THRESH_TOZERO_INV );
-		cv::gpu::threshold(param.gpu_img, param.gpu_img, 110, 255, CV_THRESH_BINARY);
-		param.gpu_img.download(param.img);
-
-
-		cv::Mat img_hsv;
-		cv::cvtColor(frame_curr, img_hsv, CV_BGR2HSV);
-		cv::inRange(img_hsv, GREY_HSV_MIN, GREY_HSV_MAX, img_hsv);
-
-		// param.img = img_hsv.clone();
-		cv::bitwise_and(param.img, img_hsv, param.img);
-
-		del_small_areas2( param.img );
+	if(param.algo_t == ALGO_CURRENT_GREY) {
+		get_bitand_diff2(param, g, frame_curr);
+		del_small_areas2(param.img);
 		param.img_threshold = param.img.clone();
 	}
-	else
-	{
-		if( param.algo_t == ALGO_DIFF )
-		{
+	else if(param.algo_t == ALGO_DIFF_GREY) {
+		get_bitand_diff3(param, g);
+		del_small_areas3(param.img);
+		param.img_threshold = param.img.clone();
+	}
+	else {
+		if( param.algo_t == ALGO_DIFF ) {
 			get_bitand_diff( param, g );
 		}
-		else
-		{
-			// cv::gpu::threshold( g->frame_grey_curr, param.gpu_img, param.threshold, 255, CV_THRESH_TOZERO );
+		else {
 			cv::gpu::threshold( g->frame_grey_next, param.gpu_img, param.threshold, 255, CV_THRESH_TOZERO );
 		}
 		get_threshold_bin( param.gpu_img, param.gpu_img_threshold, param.threshold );
@@ -552,12 +550,13 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g, const cv::Mat& frame_cur
 	get_eroded( param.img_threshold, param.img_eroded, param.erode_kernel );
 	get_dilated( param.img_eroded, param.img_dilated, param.dilate, param.dilate_kernel );
 	
-	// cv::imshow( "img", param.img );
+	cv::imshow( "img", param.img );
 	// cv::imshow( "img_", param.img_dilated );
-	if(param.algo_t == ALGO_DIFF_GREY)
-		find_text_regions2( param.img_dilated, param.regions, param.contours );
+	// cv::imshow( "img_", param.img_eroded );
+	if(param.algo_t == ALGO_DIFF || param.algo_t == ALGO_CURRENT)
+		find_text_regions(param.img_dilated, param.regions, param.contours);
 	else
-		find_text_regions( param.img_dilated, param.regions, param.contours );
+		find_text_regions2(param.img_dilated, param.regions, param.contours);
 
 	return true;
 }
@@ -578,17 +577,16 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	auto img_roi = param.img(roi);
 	bool ret = false;
 
-	if(param.algo_t == ALGO_DIFF_GREY)
-	{
-		ret = identify_text2( img_roi, ocr[ocr_idx] );
-	}
+	if(param.algo_t == ALGO_DIFF || param.algo_t == ALGO_CURRENT)
+		ret = identify_text(img_roi, ocr[ocr_idx]);
 	else
-		ret = identify_text( img_roi, ocr[ocr_idx] );
+		ret = identify_text2(img_roi, ocr[ocr_idx]);
 
 	if( ret )
 	{
 		mutex_push.lock();
 		param.roi_place = roi;
+		param.roi_place_origin = roi;
 		roi_normalize( param.roi_place, param.img.cols, param.img.rows );
 		mutex_push.unlock();
 		return true;
@@ -631,8 +629,9 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g, const cv::Ma
 			{
 				// cv::imshow( "label", param.img(roi) );
 				// cv::waitKey(2000);
-				auto cross = param.roi_place & roi;
-				// if( (double)cross.area()/roi.area() >= 0.9 ) continue;
+				auto cross = param.roi_place_origin & roi;
+				// std::cout << (double)cross.area()/roi.area() << std::endl;
+				if( (double)cross.area()/roi.area() >= 0.8 ) continue;
 
 				if( param.algo_t == ALGO_CURRENT )
 				{
@@ -659,7 +658,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 {
 	++frame_cnt;
 
-	// if( frame_cnt < 358 ) return;
+	if( frame_cnt < 900 ) return;
 	// cv::imwrite("4.jpg", frame_curr);
 	std::cout << frame_cnt << std::endl;
 	if( g )
@@ -697,7 +696,7 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					}
 				}
 				// cv::imshow("detector", frame_curr);
-				// cv::waitKey(500);
+				cv::waitKey(500);
 			}
 			g->frame_prev = g->frame_curr.clone();
 		}
