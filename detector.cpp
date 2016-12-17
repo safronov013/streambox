@@ -26,7 +26,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 	regions.reserve(32);
 	contours.reserve(1028);
 	if(algo_t == ALGO_CURRENT)		reccurence = 4;
-	if(algo_t == ALGO_CURRENT_GREY)	reccurence = 1;
+	if(algo_t == ALGO_CURRENT_GREY)	reccurence = 3;
 }
 
 std::mutex mutex_push;
@@ -251,7 +251,7 @@ bool identify_text2( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 		ret = (alpha_digit/str.size() >= 0.6);
 		if(ret)
 		{
-			std::cout << frame_cnt << " ---> " << img.cols << "x" << img.rows << " > " << str << "  " << alpha_digit << std::endl;
+			// std::cout << frame_cnt << " ---> " << img.cols << "x" << img.rows << " > " << str << "  " << alpha_digit << std::endl;
 		}
 	}
 	return ret;
@@ -425,7 +425,7 @@ void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std
 		{
 			auto box = rotated_box.boundingRect();
 
-			if( box.width >= 140 && box.width <= 260 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
+			// if( box.width >= 140 && box.width <= 260 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
 			// if( box.width >= 110 && box.width <= 290 )
 			{
 				// std::cout << "box0 = " << box << std::endl;
@@ -585,7 +585,7 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	if( ret )
 	{
 		mutex_push.lock();
-		std::cout << "\t\t" << roi << std::endl;
+		// std::cout << "\t\t" << roi << std::endl;
 		param.roi_place = roi;
 		param.roi_place_origin = roi;
 		roi_normalize( param.roi_place, param.img.cols, param.img.rows );
@@ -609,7 +609,7 @@ bool find_places_entry( std::vector<ImgParams>& params, GPUVARS* g, const cv::Ma
 	{
 		param.regions.erase( param.regions.begin(), param.regions.end() );
 		param.contours.erase( param.contours.begin(), param.contours.end() );
-		if(param.algo_t == ALGO_CURRENT || param.algo_t == ALGO_DIFF_GREY)
+		if(param.algo_t == ALGO_CURRENT || param.algo_t == ALGO_CURRENT_GREY)
 		{
 			if( param.reccurence > 1 && frame_cnt % param.reccurence != 0 ) continue;
 		}
@@ -668,10 +668,8 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 		if( !frame_curr.empty() )
 		{
 			g->frame_curr.upload(frame_curr);
-			// cv::gpu::cvtColor( g->frame_curr, g->frame_grey_curr, CV_BGR2GRAY );
 			cv::gpu::cvtColor( g->frame_curr, g->frame_grey_next, CV_BGR2GRAY );
-			// if( !g->frame_grey_prev.empty() )
-			// if( !g->frame_grey_curr.empty() && !g->frame_grey_prev.empty() )
+
 			if( !g->frame_grey_curr.empty() )
 			{
 				find_places_entry( params, g, frame_curr );
@@ -707,8 +705,6 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 
 		double frame_tm = ((double)cv::getTickCount() - beg)*1000.0/cv::getTickFrequency();
 		tm_full += frame_tm;
-		// if( frame_tm > 40 )
-			// std::cout << "\tframe_cnt = " << frame_cnt << "\tframe_tm = " << frame_tm << std::endl;
 
 		if( frame_cnt % stat_size != 0 );
 		else

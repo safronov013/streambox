@@ -87,8 +87,8 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spe
 	GPUVARS g;
 	g.frame_curr.upload(cvframe);
 	std::vector<ImgParams> params = {
-		{ 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
-		{ 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
+		// { 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
+		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
 		{ 150, 16, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
 		{ 120, 12, cv::Size(3,1), cv::Size(2,2), ALGO_CURRENT_GREY },
 		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
@@ -96,6 +96,17 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spe
 		// { 170, 10, cv::Size(4,3), cv::Size(8,6), ALGO_CURRENT }
 		// { 170, 10, cv::Size(4,3), cv::Size(3,3), ALGO_CURRENT }
 	};
+
+	if (spec_color != NULL) {
+		if (std::string(spec_color) == "--white") {
+			auto new_end = std::remove_if(params.begin(), params.end(), [](ImgParams p) { return (p.algo_t == ALGO_DIFF_GREY || p.algo_t == ALGO_CURRENT_GREY); } );
+			if (new_end != params.end()) params.erase(new_end, params.end());
+		}
+		else if (std::string(spec_color) == "--grey") {
+			auto new_end = std::remove_if(params.begin(), params.end(), [](ImgParams p) { return (p.algo_t == ALGO_DIFF || p.algo_t == ALGO_CURRENT); } );
+			if (new_end != params.end()) params.erase(new_end, params.end());
+		}
+	}
 
 	std::thread t1( infinity_loop );
 	t1.detach();
@@ -117,7 +128,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spe
 						if( pkt.stream_index == ctx->v_idx )
 						{
 							avframe_update( ctx->frame, &g, params );
-							continue;
+							// continue;
 							if( avstream_encode_video_packet( ctx, &out_pkt, avframe_dst ) )
 							{
 								if( !avstream_write_packet( ctx, &out_pkt ) )
@@ -130,7 +141,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spe
 						}
 						else
 						{
-							continue;
+							// continue;
 							if( avstream_encode_audio_packet( ctx, &out_pkt, ctx->frame ) )
 							{
 								if( !avstream_write_packet2( ctx, &out_pkt ) )
