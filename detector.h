@@ -76,6 +76,7 @@ public:
 	places_t places;
 	cv::Rect roi_place;
 	cv::Rect roi_place_origin;
+	cv::Rect roi_place_old;
 	ImgParams();
 	ImgParams( const int t, const int d, const cv::Size& d_kernel, const cv::Size& e_kernel, algorithm_t a );
 	friend std::ostream& operator<< ( std::ostream& ostr, const ImgParams& param );

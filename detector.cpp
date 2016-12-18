@@ -26,7 +26,7 @@ ImgParams::ImgParams( const int t, const int d, const cv::Size& d_kernel, const 
 	regions.reserve(32);
 	contours.reserve(1028);
 	if(algo_t == ALGO_CURRENT)		reccurence = 4;
-	if(algo_t == ALGO_CURRENT_GREY)	reccurence = 3;
+	if(algo_t == ALGO_CURRENT_GREY)	reccurence = 2;
 }
 
 std::mutex mutex_push;
@@ -225,6 +225,13 @@ bool identify_text( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	return ret;
 }
 
+
+auto npos = std::string::npos;
+std::string letter_spec = "0OD8B";
+std::string letter_1st = "(GUoJI1\\";
+std::string letter_2nd = "0O1IQB";
+std::string letter_3rd = "0O8I";
+
 bool identify_text2( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 {
 	bool ret = false;
@@ -240,20 +247,32 @@ bool identify_text2( const cv::Mat& img, tesseract::TessBaseAPI& ocr_item )
 	// std::cout << "\t" << img.cols << "x" << img.rows << "\ttext = " << str << std::endl;
 	if(str.size() < 5 || str.size() > 11) return ret;
 	// if(str.find('8') == std::string::npos && str.find('B') == std::string::npos) return ret;
-	if( (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[0] == 'J' || str[0] == 'I' || str[0] == '1' || str[0] == '\\' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[1] == 'Q' || str[1] == 'B' || str[2] == '0' || str[2] == '8' || str[2] == 'I') ||
-		(str.find("DO") != std::string::npos || str.find("D0") != std::string::npos || str.find("DD") != std::string::npos))
-	{
-		for( auto c: str )
-		{
-			if( c == 'l' || c == 'i' ) c = '1';
-			if( isupper(c) || isdigit(c) ) ++alpha_digit;
+
+
+	if (letter_spec.find(str[0]) != npos ||
+		(letter_1st.find(str[0]) != npos && str.find_first_of(letter_spec, 1) != npos) ||
+		(letter_2nd.find(str[1]) != npos && str.find_first_of(letter_spec, 2) != npos) ||
+		(letter_3rd.find(str[2]) != npos && str.find_first_of(letter_spec, 3) != npos) ||
+		(str.find("DO") != npos || str.find("D0") != npos || str.find("DD") != npos)) {
+
+	// if( (str[0] == '0' || str[0] == 'O' || str[0] == 'D' || str[0] == '(' || str[0] == '8' || str[0] == 'G' || str[0] == 'U' || str[0] == 'o' || str[0] == 'J' || str[0] == 'I' || str[0] == '1' || str[0] == '\\' || str[1] == '0' || str[1] == 'O' || str[1] == '1' || str[1] == 'Q' || str[1] == 'B' || str[2] == '0' || str[2] == '8' || str[2] == 'I') ||
+	// 	(str.find("DO") != std::string::npos || str.find("D0") != std::string::npos || str.find("DD") != std::string::npos))
+	// {
+		for (auto c: str) {
+			if (c == 'l' || c == 'i') c = '1';
+			if (isupper(c) || isdigit(c)) ++alpha_digit;
 		}
 		ret = (alpha_digit/str.size() >= 0.6);
-		if(ret)
-		{
-			// std::cout << frame_cnt << " ---> " << img.cols << "x" << img.rows << " > " << str << "  " << alpha_digit << std::endl;
+		if (ret) {
+			std::cout << frame_cnt << " ---> " << img.cols << "x" << img.rows << " > " << str << "  " << alpha_digit << std::endl;
 		}
+		// else
+		// 	std::cout << "\tFake by alpha: " << img.cols << "x" << img.rows << "\ttext = " << str << std::endl;
 	}
+	// else
+	// {
+	// 	std::cout << "\tFake: " << img.cols << "x" << img.rows << "\ttext = " << str << std::endl;
+	// }
 	return ret;
 }
 
@@ -425,6 +444,8 @@ void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std
 		{
 			auto box = rotated_box.boundingRect();
 
+			if (box.y > 1045) continue;
+
 			// if( box.width >= 140 && box.width <= 260 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
 			// if( box.width >= 110 && box.width <= 290 )
 			{
@@ -582,10 +603,11 @@ bool find_places_by_text( ImgParams& param, const cv::Rect& roi, int ocr_idx )
 	else
 		ret = identify_text2(img_roi, ocr[ocr_idx]);
 
-	if( ret )
-	{
+	if (ret) {
 		mutex_push.lock();
 		// std::cout << "\t\t" << roi << std::endl;
+		if (param.roi_place.area() > 0)
+			param.roi_place_old = param.roi_place;
 		param.roi_place = roi;
 		param.roi_place_origin = roi;
 		roi_normalize( param.roi_place, param.img.cols, param.img.rows );
@@ -674,11 +696,23 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 			{
 				find_places_entry( params, g, frame_curr );
 
-				for( auto param: params )
-				{
-					// cv::Mat tmp = frame_curr(param.roi_place);
-					// hide_text( tmp );
-					draw_rectangle(frame_curr, param.roi_place);
+				for (auto param: params) {
+					cv::Mat tmp = frame_curr(param.roi_place);
+					hide_text(tmp);
+					if (param.algo_t == ALGO_CURRENT_GREY) {
+						tmp = frame_curr(param.roi_place_old);
+						hide_text(tmp);
+					}
+					// draw_rectangle(frame_curr, param.roi_place);
+				}
+
+				for (auto param: params) {
+					if (param.algo_t == ALGO_DIFF_GREY || param.algo_t == ALGO_CURRENT_GREY) {
+						cv::Rect r{12, 1052, 1900, 26};
+						cv::Mat tmp2 = frame_curr(r);
+						hide_text(tmp2);
+						break;
+					}
 				}
 
 				std::lock_guard<std::mutex> lg(g_mutex);
@@ -687,9 +721,9 @@ void img_detect_label( cv::Mat& frame_curr, std::vector<ImgParams>& params, GPUV
 					{
 						if( r.left > 0 )
 						{
-							// cv::Mat tmp = frame_curr(r.roi_norm);
-							// hide_text( tmp );
-							draw_rectangle(frame_curr, r.roi_norm);
+							cv::Mat tmp = frame_curr(r.roi_norm);
+							hide_text( tmp );
+							// draw_rectangle(frame_curr, r.roi_norm);
 							--r.left;
 						}
 					}

@@ -89,7 +89,7 @@ void avstream_main( AVSTREAMCTX* ctx, char* source, char* destination, char* spe
 	std::vector<ImgParams> params = {
 		// { 200, 12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 170, 10, cv::Size(3,1), cv::Size(5,2), ALGO_CURRENT },
-		{ 150, 16, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
+		// { 150, 16, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF_GREY },
 		{ 120, 12, cv::Size(3,1), cv::Size(2,2), ALGO_CURRENT_GREY },
 		// { 10,  12, cv::Size(3,1), cv::Size(3,3), ALGO_DIFF },
 		// { 20,  5,  cv::Size(5,1), cv::Size(1,1), ALGO_DIFF },
