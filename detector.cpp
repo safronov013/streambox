@@ -444,7 +444,7 @@ void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std
 		{
 			auto box = rotated_box.boundingRect();
 
-			if (box.y > 1045) continue;
+			// if (box.y > 1045) continue;
 
 			// if( box.width >= 140 && box.width <= 260 && box.height >= 5 && box.height <= 46 && box.width/box.height <= 30 )
 			// if( box.width >= 110 && box.width <= 290 )
@@ -456,12 +456,11 @@ void find_text_regions2( const cv::Mat& img, std::vector<cv::Rect>& regions, std
 				// regions.push_back(box);
 			}
 
-			if( box.width >= 167 && box.width <= 220 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 && (box.y < 500 || box.y > 900) )
+			// if( box.width >= 167 && box.width <= 215 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 && (box.y < 500 || box.y > 900) )
+			if( box.width >= 167 && box.width <= 187 && box.height >= 16 && box.height <= 46 && box.width/box.height >= 4 && box.width/box.height <= 12 && (box.y < 500 || box.y > 900) )
 			{
-				// std::cout << "box1 = " << box << std::endl;
 				if( box.height <= 19 ) { box.y -= 2; box.height += 4; }
 				if( box.height > 40 )  box.height = 30;
-				// if( box.y > 1033 ) { box.y = 1055; box.height = 25; }
 				if( box.x > 0 && box.y > 0 && box.width > 0 && box.height > 0 && box.x+box.width < img.cols && box.y+box.height <= img.rows )
 				{
 					// std::cout << "box = " << box << std::endl;
@@ -574,10 +573,11 @@ bool find_places_by_size( ImgParams& param, GPUVARS* g, const cv::Mat& frame_cur
 	// cv::imshow( "img", param.img );
 	// cv::imshow( "img_", param.img_dilated );
 	// cv::imshow( "img_", param.img_eroded );
-	if(param.algo_t == ALGO_DIFF || param.algo_t == ALGO_CURRENT)
+	if (param.algo_t == ALGO_DIFF || param.algo_t == ALGO_CURRENT)
 		find_text_regions(param.img_dilated, param.regions, param.contours);
-	else
+	else {
 		find_text_regions2(param.img_dilated, param.regions, param.contours);
+	}
 
 	return true;
 }
