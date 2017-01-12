@@ -1,0 +1,4 @@
+nvidia-driver
+cuda 7.5
+ffmpeg 3.1.4 (with nvidia encoding)
+opencv 2.4.13 (with cuda support)
